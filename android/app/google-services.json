@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "9105005440",
+    "project_id": "stewyrt-11",
+    "storage_bucket": "stewyrt-11.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:9105005440:android:8b3e913cac5c391cbe7f65",
+        "android_client_info": {
+          "package_name": "com.stewyrt.stewyrt"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyANmaWmTwYTC43VuiYP4JadOqRh_aLp9rw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

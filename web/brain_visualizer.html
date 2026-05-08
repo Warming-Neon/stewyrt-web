@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Zeitgeist Brain Visualizer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #020611; overflow: hidden; margin: 0; padding: 0; touch-action: none; font-family: 'Space Grotesk', sans-serif; }
+
+    #canvas-container { width: 100vw; height: 100vh; position: relative; }
+    canvas { display: block; }
+
+    /* ── DEBUG overlay — remove when issue is resolved ── */
+    #dbg {
+      position: fixed; top: 60px; left: 10px; z-index: 9999;
+      pointer-events: none; font-family: monospace; font-size: 11px;
+      color: #00ff88; background: rgba(0,0,0,0.7);
+      padding: 6px 10px; border-radius: 4px; line-height: 1.7;
+      max-width: 90vw; word-break: break-all;
+    }
+
+    #tooltip {
+      display: none;
+      position: absolute;
+      background: #000000;
+      color: #E8E8E8;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 0;
+      padding: 10px 16px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      pointer-events: none;
+      z-index: 100;
+      white-space: nowrap;
+      line-height: 1.6;
+    }
+    #tooltip .emotion-name { font-size: 15px; font-weight: 700; }
+    #tooltip .emotion-pct  { font-size: 13px; opacity: 0.75; }
+  </style>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+<div id="dbg">⏳ waiting for module…</div>
+<div id="canvas-container">
+  <div id="tooltip">
+    <div class="emotion-name" id="tt-name"></div>
+    <div class="emotion-pct"  id="tt-pct"></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three":              "https://unpkg.com/three@0.161.0/build/three.module.js",
+    "three/addons/":      "https://unpkg.com/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+// ── Debug helper — writes to the on-screen overlay AND console ────────────────
+const _dbgEl = document.getElementById('dbg');
+let _dbgLines = [];
+function dbg(msg) {
+  console.log('[BRAIN] ' + msg);
+  _dbgLines.push(msg);
+  if (_dbgLines.length > 8) _dbgLines.shift();
+  if (_dbgEl) _dbgEl.innerHTML = _dbgLines.map(l => '▸ ' + l).join('<br>');
+}
+dbg('module executing');
+
+import * as THREE from 'three';
+import { OrbitControls }   from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer }  from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass }      from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// ─── Scene ────────────────────────────────────────────────────────────────────
+const container = document.getElementById('canvas-container');
+const W = container.clientWidth, H = container.clientHeight;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(W, H);
+renderer.toneMapping    = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.8;
+container.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+scene.background = new THREE.Color(0x020611);
+scene.fog = new THREE.FogExp2(0x020611, 0.018);
+
+const camera = new THREE.PerspectiveCamera(55, W / H, 0.1, 400);
+camera.position.set(0, 0, 35);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.minDistance   = 15;
+controls.maxDistance   = 100;
+controls.target.set(0, 0, 0);
+
+// ─── Post-processing ──────────────────────────────────────────────────────────
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(W, H), 0.8, 0.55, 0.4);
+composer.addPass(bloom);
+
+// ─── Ambient + point lights ───────────────────────────────────────────────────
+scene.add(new THREE.AmbientLight(0x111133, 2));
+[[10, 10, 10, 0x5566ff], [-10, -5, -10, 0xff3366], [0, 15, -5, 0x00ffaa]].forEach(
+  ([x, y, z, c]) => { const l = new THREE.PointLight(c, 1.4, 80); l.position.set(x, y, z); scene.add(l); }
+);
+
+// ─── Filler synapses (background fog nodes) ───────────────────────────────────
+const fillerGeo    = new THREE.IcosahedronGeometry(0.28, 1);
+const fillerColors = [0x223355, 0x1a1a3a, 0x2a1a2a, 0x0a2a1a];
+for (let i = 0; i < 120; i++) {
+  const mat = new THREE.MeshStandardMaterial({
+    color:             fillerColors[i % fillerColors.length],
+    emissive:          new THREE.Color(fillerColors[i % fillerColors.length]),
+    emissiveIntensity: 0.4,
+    metalness: 0.6, roughness: 0.4,
+  });
+  const mesh  = new THREE.Mesh(fillerGeo, mat);
+  const theta = Math.random() * Math.PI * 2;
+  const phi   = Math.acos(2 * Math.random() - 1);
+  const r     = 8 + Math.random() * 10;
+  mesh.position.set(
+    r * 1.6 * Math.sin(phi) * Math.cos(theta),
+    r * 1.0 * Math.cos(phi),
+    r * 1.1 * Math.sin(phi) * Math.sin(theta)
+  );
+  scene.add(mesh);
+}
+
+// ─── Nebula particle field ────────────────────────────────────────────────────
+// 800 points spread widely in deep space (40–180 units). fog:false so the scene
+// fog doesn't kill them; AdditiveBlending makes overlapping clouds glow softly.
+{
+  const COUNT = 800;
+  const positions = new Float32Array(COUNT * 3);
+  const colors    = new Float32Array(COUNT * 3);
+
+  // Palette: soft deep-space blues, purples, teals
+  const palette = [
+    new THREE.Color(0x1a3a6a), // deep blue
+    new THREE.Color(0x2a1a5a), // indigo-purple
+    new THREE.Color(0x0a3a4a), // dark teal
+    new THREE.Color(0x3a1a4a), // violet
+    new THREE.Color(0x0a2a5a), // navy
+    new THREE.Color(0x152840), // slate blue
+  ];
+
+  for (let i = 0; i < COUNT; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.acos(2 * Math.random() - 1);
+    const r     = 40 + Math.random() * 140;
+    positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = r * Math.cos(phi);
+    positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+
+    const c = palette[Math.floor(Math.random() * palette.length)];
+    const brightness = 0.25 + Math.random() * 0.55;
+    colors[i * 3]     = c.r * brightness;
+    colors[i * 3 + 1] = c.g * brightness;
+    colors[i * 3 + 2] = c.b * brightness;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color',    new THREE.BufferAttribute(colors, 3));
+
+  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({
+    size:            1.4,
+    sizeAttenuation: true,
+    vertexColors:    true,
+    transparent:     true,
+    opacity:         0.55,
+    blending:        THREE.AdditiveBlending,
+    depthWrite:      false,
+    fog:             false, // rendered at full opacity regardless of scene fog
+  })));
+}
+
+// ─── Dynamic node state ───────────────────────────────────────────────────────
+const nodeMeshes  = [];              // THREE.Mesh[] — used by raycaster + anim loop
+const nodeDataMap = new Map();       // mesh.uuid → emotion data object
+const nodesByName = new Map();       // emotion name → emotion data object
+const pathObjects = [];              // { curve, color, nextFireAt, activePulses[] }
+
+// ─── Camera focus tween state ─────────────────────────────────────────────────
+// null when idle; { startPos, endPos, startTarget, endTarget, elapsed, duration, em } when animating
+let _focusTween = null;
+
+// ─── Region position bounds ───────────────────────────────────────────────────
+// Returns { x:[lo,hi], y:[lo,hi], z:[lo,hi] } for a random point in that region.
+// Insula alternates left/right side as more nodes are added.
+function regionBounds(region) {
+  switch (region) {
+    case 'Amygdala':
+      // Center ≈ (0, -5, -3)
+      return { x: [-6, 6], y: [-8, -2], z: [-8, 2] };
+    case 'Nucleus':
+      // Center ≈ (0, 4, -1)
+      return { x: [-6, 6], y: [0, 8], z: [-6, 4] };
+    case 'Insula': {
+      // Center ≈ (±12, 0, 0)
+      const insulaCount = Array.from(nodesByName.values())
+        .filter(em => em.region === 'Insula').length;
+      const side = insulaCount % 2 === 0 ? -1 : 1;
+      return { x: [side * 8, side * 16], y: [-5, 5], z: [-5, 5] };
+    }
+    default: // Prefrontal — center ≈ (0, 3.5, 7)
+      return { x: [-8, 8], y: [-1, 8], z: [2, 12] };
+  }
+}
+
+// ─── Region hue palette ───────────────────────────────────────────────────────
+// Returns a 0–1 hue value (THREE.Color HSL) for the given region.
+function regionHue(region) {
+  const rng = (lo, hi) => lo + Math.random() * (hi - lo);
+  switch (region) {
+    case 'Amygdala':  return rng(0.00, 0.10); // reds → oranges
+    case 'Nucleus':   return rng(0.19, 0.36); // yellows → greens
+    case 'Insula':    return rng(0.44, 0.56); // teals → cyans
+    default:          return rng(0.61, 0.78); // blues → purples (Prefrontal)
+  }
+}
+
+// ─── Create a new organic emotion node (Group: bright core + deformed membrane) ─
+function createNode(name, pct, region) {
+  const b   = regionBounds(region);
+  const rng = (lo, hi) => lo + Math.random() * (hi - lo);
+
+  // Collision check against stored em positions (meshes are group-local, not world-space)
+  const pos = new THREE.Vector3();
+  for (let attempt = 0; attempt < 30; attempt++) {
+    pos.set(rng(b.x[0], b.x[1]), rng(b.y[0], b.y[1]), rng(b.z[0], b.z[1]));
+    const tooClose = Array.from(nodesByName.values()).some(em => em.pos.distanceTo(pos) < 2.5);
+    if (!tooClose) break;
+  }
+
+  const hue      = regionHue(region);
+  const colorObj = new THREE.Color().setHSL(hue, 1.0, 0.58);
+  const hexColor = colorObj.getHex();
+
+  // Radius scales with percentage (5–50 → 0.8–2.6)
+  const r = 0.8 + (Math.min(pct, 50) / 50) * 1.8;
+
+  // ── Core: pure white — punches through bloom as a blinding glowing center ─────
+  const coreGeo  = new THREE.IcosahedronGeometry(r * 0.4, 3);
+  const coreMesh = new THREE.Mesh(coreGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+
+  // ── Membrane: organically deformed semi-transparent shell ────────────────────
+  const memGeo  = new THREE.IcosahedronGeometry(r, 2);
+  const posAttr = memGeo.attributes.position;
+  for (let i = 0; i < posAttr.count; i++) {
+    posAttr.setX(i, posAttr.getX(i) * (1 + (Math.random() - 0.5) * 0.12));
+    posAttr.setY(i, posAttr.getY(i) * (1 + (Math.random() - 0.5) * 0.12));
+    posAttr.setZ(i, posAttr.getZ(i) * (1 + (Math.random() - 0.5) * 0.12));
+  }
+  posAttr.needsUpdate = true;
+  memGeo.computeVertexNormals();
+
+  const memMesh = new THREE.Mesh(memGeo, new THREE.MeshStandardMaterial({
+    color:             hexColor,
+    emissive:          new THREE.Color(hexColor),
+    emissiveIntensity: 1.5, // birth flash — decays to 0.2 baseline
+    transparent:       true,
+    opacity:           0.55,
+    roughness:         0.8,
+    metalness:         0.2,
+    depthWrite:        false,
+  }));
+
+  // ── Group: world-space position; children are at local origin ────────────────
+  const group = new THREE.Group();
+  group.add(coreMesh);
+  group.add(memMesh);
+  group.position.copy(pos);
+  scene.add(group);
+
+  const em = { id: name, pct, color: hexColor, pos, r, region,
+               _group: group, _mesh: memMesh, _core: coreMesh,
+               _baseR: r, _flashTime: 0.0 };
+
+  // Only membrane in nodeMeshes for raycasting; core also registered so clicking
+  // through the transparent membrane resolves to the same em.
+  nodeMeshes.push(memMesh);
+  nodeDataMap.set(memMesh.uuid, em);
+  nodeDataMap.set(coreMesh.uuid, em);
+  nodesByName.set(name, em);
+  return em;
+}
+
+// Shared comet geometry — one instance reused across all pulse meshes
+const _cometGeo = new THREE.SphereGeometry(0.15, 5, 5);
+
+// ─── Add a data-driven CatmullRom path between two emotion objects ───────────
+// weight scales line opacity: w=1 → 0.10, w=10 → 0.41, capped at 0.55.
+// Stores the line reference so clearPaths() can remove it from the scene.
+function addPath(emA, emB, weight = 1) {
+  const mid = emA.pos.clone().lerp(emB.pos, 0.5).add(
+    new THREE.Vector3(
+      (Math.random() - 0.5) * 8,
+      (Math.random() - 0.5) * 8,
+      (Math.random() - 0.5) * 8
+    )
+  );
+  const curve   = new THREE.CatmullRomCurve3([emA.pos, mid, emB.pos]);
+  const pts     = curve.getPoints(60);
+  const blended = blendColors(emA.color, emB.color);
+  const opacity = Math.min(0.10 + (weight - 1) * 0.035, 0.55);
+  const line    = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: blended, transparent: true, opacity })
+  );
+  scene.add(line);
+
+  const path = {
+    curve,
+    color:        blended,
+    line,
+    nextFireAt:   clock.getElapsedTime() + 2 + Math.random() * 6,
+    activePulses: [],
+  };
+  pathObjects.push(path);
+  return path;
+}
+
+// ─── Spawn a cluster of 1–3 fast comets on a path (the "speedy fuse") ─────────
+function firePath(path, currentTime) {
+  const count = 1 + Math.floor(Math.random() * 3);
+  const speed = 0.8 + Math.random() * 0.5;          // traverses full path in ~0.8–1.6 s
+  for (let i = 0; i < count; i++) {
+    const mat  = new THREE.MeshStandardMaterial({
+      color:             path.color,
+      emissive:          new THREE.Color(path.color),
+      emissiveIntensity: 4.0,
+      metalness:         1.0,
+      roughness:         0.0,
+    });
+    const mesh = new THREE.Mesh(_cometGeo, mat);
+    scene.add(mesh);
+    path.activePulses.push({ t: i * 0.06, speed, mesh });
+  }
+  path.nextFireAt = currentTime + 2 + Math.random() * 6;  // next idle: 2–8 s
+}
+
+// ─── Remove all live paths from the scene and clear the pathObjects array ─────
+function clearPaths() {
+  pathObjects.forEach(path => {
+    scene.remove(path.line);
+    path.line.geometry.dispose();
+    path.line.material.dispose();
+    path.activePulses.forEach(p => {
+      scene.remove(p.mesh);
+      p.mesh.material.dispose();
+    });
+  });
+  pathObjects.length = 0;
+}
+
+// ─── Camera anchor: orbit around the true centroid of all nodes ──────────────
+function updateCameraAnchor() {
+  const nodes = Array.from(nodesByName.values());
+  if (nodes.length === 0) return;
+  const centroid = new THREE.Vector3();
+  nodes.forEach(em => centroid.add(em.pos));
+  centroid.divideScalar(nodes.length);
+  controls.target.copy(centroid);
+}
+
+// ─── Programmatic camera focus ───────────────────────────────────────────────
+function focusOnNode(nodeName) {
+  const em = nodesByName.get(nodeName);
+  if (!em) return;
+  hideTooltip();
+  // Approach from outside the scene: extend scene-centre → node direction by 12 units
+  const dir = em.pos.lengthSq() > 0.001
+    ? em.pos.clone().normalize()
+    : new THREE.Vector3(0, 0, 1);
+  _focusTween = {
+    startPos:    camera.position.clone(),
+    endPos:      em.pos.clone().add(dir.multiplyScalar(12)),
+    startTarget: controls.target.clone(),
+    endTarget:   em.pos.clone(),
+    elapsed:     0,
+    duration:    1.2,
+    em,
+  };
+}
+window.focusOnNode = focusOnNode;
+
+// ─── Tooltip ──────────────────────────────────────────────────────────────────
+const tooltip   = document.getElementById('tooltip');
+const ttName    = document.getElementById('tt-name');
+const ttPct     = document.getElementById('tt-pct');
+const raycaster = new THREE.Raycaster();
+const mouse     = new THREE.Vector2();
+
+function showTooltip(em, screenX, screenY) {
+  ttName.textContent = em.id;
+  ttPct.textContent  = `${em.pct}%`;
+  tooltip.style.display = 'block';
+  const tw = tooltip.offsetWidth  || 120;
+  const th = tooltip.offsetHeight || 60;
+  tooltip.style.left = Math.min(screenX + 14, W - tw - 8) + 'px';
+  tooltip.style.top  = Math.min(screenY - 10, H - th - 8) + 'px';
+}
+
+function hideTooltip() { tooltip.style.display = 'none'; }
+
+// Use pointerdown/pointerup instead of 'click' — WKWebView (iOS) swallows
+// click events when OrbitControls is active. Guard against drags (>5 px).
+let _pdX = 0, _pdY = 0;
+renderer.domElement.addEventListener('pointerdown', e => { _pdX = e.clientX; _pdY = e.clientY; });
+renderer.domElement.addEventListener('pointerup', e => {
+  const dx = e.clientX - _pdX, dy = e.clientY - _pdY;
+  if (dx * dx + dy * dy > 25) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  mouse.x =  ((e.clientX - rect.left) / rect.width)  * 2 - 1;
+  mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(nodeMeshes);
+  if (hits.length > 0) {
+    const em = nodeDataMap.get(hits[0].object.uuid);
+    if (em) { showTooltip(em, e.clientX - rect.left, e.clientY - rect.top); return; }
+  }
+  hideTooltip();
+});
+
+// ─── Core data processor — called by both bridges below ───────────────────────
+function processBrainData(data) {
+  if (!data) { dbg('processBrainData: null data'); return; }
+
+  if (typeof data.focus === 'string') { dbg('focus: ' + data.focus); focusOnNode(data.focus); return; }
+
+  if (!Array.isArray(data.nodes)) { dbg('processBrainData: no nodes array, keys=' + Object.keys(data).join(',')); return; }
+
+  dbg('processBrainData: ' + data.nodes.length + ' nodes, ' + (data.edges ? data.edges.length : 0) + ' edges');
+
+  // ── Pass 1: nodes ──────────────────────────────────────────────────────────
+  let newNodes = 0;
+  data.nodes.forEach(({ name, percent, region }) => {
+    if (!name || percent === undefined) return;
+    const safeRegion = ['Prefrontal','Amygdala','Nucleus','Insula'].includes(region)
+      ? region : 'Prefrontal';
+
+    if (nodesByName.has(name)) {
+      const em  = nodesByName.get(name);
+      em.pct    = percent;
+      const scale = 0.7 + (Math.min(percent, 50) / 50) * 2.3;
+      em._group.scale.setScalar(scale);
+      em._mesh.material.emissiveIntensity = 1.5;
+      em._flashTime = 0.0;
+    } else {
+      createNode(name, percent, safeRegion);
+      newNodes++;
+    }
+  });
+  dbg('created ' + newNodes + ' new, total=' + nodesByName.size);
+  if (newNodes > 0) updateCameraAnchor();
+
+  // ── Pass 2: edges ──────────────────────────────────────────────────────────
+  if (Array.isArray(data.edges)) {
+    clearPaths();
+    const now = clock.getElapsedTime();
+    data.edges.forEach(({ source, target, weight = 1 }) => {
+      const emA = nodesByName.get(source);
+      const emB = nodesByName.get(target);
+      if (!emA || !emB) return;
+      firePath(addPath(emA, emB, weight), now);
+    });
+  }
+}
+
+// ─── Native mobile bridge (Flutter WebView → runJavaScript) ──────────────────
+// Calls processBrainData directly — avoids the same-window postMessage hop
+// that WKWebView does not reliably dispatch back to its own listeners.
+window.updateBrainDataNative = function(jsonString) {
+  let parsed;
+  try { parsed = JSON.parse(jsonString); } catch(err) { dbg('JSON parse error: ' + err); return; }
+  dbg('native bridge: nodes=' + (parsed.nodes ? parsed.nodes.length : '?') + ' edges=' + (parsed.edges ? parsed.edges.length : '?'));
+  processBrainData(parsed);
+};
+
+// ─── Web iframe bridge (Flutter web → postMessage) ────────────────────────────
+// Supported payloads:
+//   { nodes: [{name, percent, region}], edges: [{source, target, weight}] }
+//   { focus: 'NodeName' }
+window.addEventListener('message', e => {
+  let data;
+  try { data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; }
+  catch { return; }
+  processBrainData(data);
+});
+
+// ─── Animation loop ───────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const t  = clock.getElapsedTime();
+
+  nodeMeshes.forEach(m => {
+    const em = nodeDataMap.get(m.uuid);
+    if (!em) return;
+    // Membrane emissive flash decay → 0.2 baseline (core provides persistent brightness)
+    em._flashTime += dt;
+    m.material.emissiveIntensity = Math.max(0.2, 1.5 * Math.exp(-em._flashTime * 3.5));
+    // Subtle breathing scale on the group (world-space position, not local mesh)
+    const breathe = 1 + 0.04 * Math.sin(t * 1.4 + em._group.position.x);
+    em._group.scale.x = em._group.scale.x * 0.97 + breathe * 0.03;
+    em._group.scale.y = em._group.scale.y * 0.97 + breathe * 0.03;
+    em._group.scale.z = em._group.scale.z * 0.97 + breathe * 0.03;
+  });
+
+  // ── PulseManager: advance active pulses, fire idle paths on schedule ──────
+  pathObjects.forEach(path => {
+    for (let i = path.activePulses.length - 1; i >= 0; i--) {
+      const p = path.activePulses[i];
+      p.t += p.speed * dt;
+      if (p.t >= 1.0) {
+        scene.remove(p.mesh);
+        p.mesh.material.dispose();
+        path.activePulses.splice(i, 1);
+      } else {
+        p.mesh.position.copy(path.curve.getPointAt(p.t));
+      }
+    }
+    if (t >= path.nextFireAt) firePath(path, t);
+  });
+
+  // ── Focus tween ──────────────────────────────────────────────────────────
+  if (_focusTween) {
+    controls.enabled = false;
+    _focusTween.elapsed += dt;
+    const raw = Math.min(_focusTween.elapsed / _focusTween.duration, 1.0);
+    // Cubic ease-in-out
+    const ease = raw < 0.5 ? 4 * raw * raw * raw : 1 - Math.pow(-2 * raw + 2, 3) / 2;
+    camera.position.lerpVectors(_focusTween.startPos, _focusTween.endPos, ease);
+    controls.target.lerpVectors(_focusTween.startTarget, _focusTween.endTarget, ease);
+    camera.lookAt(controls.target);
+    if (raw >= 1.0) {
+      controls.enabled = true;
+      // Project node to screen and open tooltip
+      const ndc = _focusTween.em.pos.clone().project(camera);
+      const sx  = (ndc.x * 0.5 + 0.5) * container.clientWidth;
+      const sy  = (-ndc.y * 0.5 + 0.5) * container.clientHeight;
+      showTooltip(_focusTween.em, sx, sy);
+      _focusTween = null;
+    }
+  }
+
+  controls.update();
+  composer.render();
+}
+animate();
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  const w = container.clientWidth, h = container.clientHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function blendColors(ca, cb) {
+  const a = new THREE.Color(ca), b = new THREE.Color(cb);
+  return a.lerp(b, 0.5).getHex();
+}
+
+// Signal Flutter WebView that Three.js is fully initialised and ready for data.
+// BrainChannel is only defined inside a webview_flutter WebView; in a regular
+// browser this line is a no-op.
+dbg('module done, BrainChannel=' + (typeof BrainChannel));
+if (typeof BrainChannel !== 'undefined') {
+  BrainChannel.postMessage('ready');
+  dbg('ready signal sent');
+}
+</script>
+</body>
+</html>
