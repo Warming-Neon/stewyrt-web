@@ -43,7 +43,9 @@ stewyrt/
 │   │
 │   ├── services/
 │   │   ├── firestore_service.dart        — listenForResult() with timeout + moderation check
-│   │   ├── storage_service.dart          — uploadAudioClip(), uploadOnboardingAudio()
+│   │   ├── storage_service.dart          — uploadAudioClip(), uploadOnboardingAudio() — uses putData + conditional import for web compat
+│   │   ├── upload_bytes_io.dart          — Native impl: File.readAsBytes()
+│   │   ├── upload_bytes_web.dart         — Web impl: fetch() + arrayBuffer() via dart:js_interop
 │   │   ├── auth_service.dart             — signInAnonymously()
 │   │   └── zeitgeist_controller.dart     — Static coordinator: tab switching + focus callbacks
 │   │
@@ -59,6 +61,8 @@ stewyrt/
 │
 ├── web/
 │   ├── brain_visualizer.html             — Self-contained Three.js 3D brain (The Resonance)
+│   ├── privacy.html                      — Privacy & Ethical Usage Policy (GDPR/UK PECR compliant)
+│   ├── terms.html                        — Terms of Service (England & Wales, 18+ gate)
 │   ├── index.html                        — Flutter web bootstrap (generated)
 │   ├── manifest.json                     — PWA manifest (generated)
 │   ├── favicon.png
@@ -299,6 +303,30 @@ idle → recording → previewing → waiting → results
 
 ---
 
+## Boot Router (`boot_router.dart`)
+
+Shown on app launch. Calls `AuthService.signInAnonymously()` then reads `SharedPreferences` to route:
+
+| State | Destination |
+|-------|-------------|
+| `hasPassedBouncer = false` | `OnboardingScreen` |
+| `hasPassedBouncer = true`, `hasCompletedDayOne = false` | `DayOneScreen` |
+| Both true | `RootShell` |
+
+On web, a compliance `SnackBar` is shown via `addPostFrameCallback` — summarises mindful usage, AI fallibility, and cookie notice. The entire `_init()` is wrapped in try/catch; a connection-error snackbar is shown if Firebase init fails.
+
+---
+
+## Onboarding Screen (`onboarding_screen.dart`)
+
+Demographics collection + voice verification. Age gate: **18 years or older**.
+
+Consent checkboxes use `InlineSpan` labels (`_SharpCheckbox` takes `InlineSpan`, not `String`). The Terms of Service and Privacy Policy labels are tappable links — `TapGestureRecognizer` opens `stewyrt.com/terms.html` and `stewyrt.com/privacy.html` via `url_launcher`. Recognizers are disposed in `dispose()`.
+
+Audio path: `kIsWeb ? '' : getTemporaryDirectory().path/onboarding_<ts>.m4a`. Web uses the empty-path fetch path in `upload_bytes_web.dart`.
+
+---
+
 ## Firestore Service (`firestore_service.dart`)
 
 `FirestoreService.listenForResult(responseId, onResult, { onBlocked, onTimeout })`:
@@ -311,6 +339,8 @@ idle → recording → previewing → waiting → results
 ---
 
 ## Storage Service (`storage_service.dart`)
+
+**Platform-safe upload:** Both methods use `readPathAsBytes(path)` from a conditional import (`upload_bytes_io.dart` on native, `upload_bytes_web.dart` on web) and call `ref.putData(bytes)`. This replaces the previous `dart:io File` + `ref.putFile()` approach which did not compile on web. On web, `localFilePath` is an empty string and bytes are fetched via `window.fetch()`.
 
 **`uploadAudioClip(localPath, uuid, question, pollId, responseId)`**
 - Uploads to `audio_uploads/<uuid>.m4a` as `audio/mp4`
@@ -478,6 +508,7 @@ window.addEventListener('message', e => { processBrainData(typeof e.data === 'st
 | `path_provider ^2.1.4` | Temp directory for recordings |
 | `web ^1.1.1` | Modern Flutter web DOM interop |
 | `webview_flutter ^4.13.1` | Native WebView for The Resonance on iOS/Android |
+| `url_launcher ^6.3.0` | Opens Terms/Privacy links from onboarding checkboxes |
 
 **Web interop:** Use `package:web` + `dart:js_interop` (not deprecated `dart:html`). `dart:ui_web` for `platformViewRegistry`.
 
