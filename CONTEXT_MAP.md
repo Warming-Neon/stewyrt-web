@@ -104,6 +104,8 @@ stewyrt/
 
 Bottom nav: three tabs + right-side theme toggle icon. Theme state via `ThemeNotifier` (Provider).
 
+Tab 0 ("Stewyrt") uses a Space Grotesk bold 'S' text widget as its icon (via optional `iconWidget` on `_NavItem`). The other two tabs use `IconData`.
+
 `ResonanceController` is a static service registered in `_RootShellState.initState()`:
 - `registerTabSwitcher(fn)` — called by `RootShell` to allow any screen to switch tabs
 - `registerFocus(fn)` / `unregisterFocus()` — called by the active Resonance screen
@@ -691,6 +693,8 @@ final bg  = isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
 ```
 
 **Buttons:** `_OutlineButton` (border, transparent bg) and `_FilledButton` (solid bg). Always `GestureDetector` + `HapticFeedback.lightImpact()`.
+
+**`PollCard` tier labels:** card header reads from `PollData.tier` (Firestore `polls/{id}['tier']`, defaults `'pulse'`). Values: `'horizon'` → **HORIZON**, `'icebreaker'` → **ICE BREAKER**, anything else → **THE PULSE**. Pulse questions are never labelled by category name.
 
 **Chips:** `_TagChip` / `_Chip` — small allcaps label + larger value, rounded 12px container.
 

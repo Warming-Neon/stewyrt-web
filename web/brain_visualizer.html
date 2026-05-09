@@ -11,15 +11,6 @@
     #canvas-container { width: 100vw; height: 100vh; position: relative; }
     canvas { display: block; }
 
-    /* ── DEBUG overlay — remove when issue is resolved ── */
-    #dbg {
-      position: fixed; top: 60px; left: 10px; z-index: 9999;
-      pointer-events: none; font-family: monospace; font-size: 11px;
-      color: #00ff88; background: rgba(0,0,0,0.7);
-      padding: 6px 10px; border-radius: 4px; line-height: 1.7;
-      max-width: 90vw; word-break: break-all;
-    }
-
     #tooltip {
       display: none;
       position: absolute;
@@ -44,7 +35,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
 </head>
 <body>
-<div id="dbg">⏳ waiting for module…</div>
 <div id="canvas-container">
   <div id="tooltip">
     <div class="emotion-name" id="tt-name"></div>
@@ -62,15 +52,7 @@
 </script>
 
 <script type="module">
-// ── Debug helper — writes to the on-screen overlay AND console ────────────────
-const _dbgEl = document.getElementById('dbg');
-let _dbgLines = [];
-function dbg(msg) {
-  console.log('[BRAIN] ' + msg);
-  _dbgLines.push(msg);
-  if (_dbgLines.length > 8) _dbgLines.shift();
-  if (_dbgEl) _dbgEl.innerHTML = _dbgLines.map(l => '▸ ' + l).join('<br>');
-}
+function dbg(msg) { console.log('[BRAIN] ' + msg); }
 dbg('module executing');
 
 import * as THREE from 'three';

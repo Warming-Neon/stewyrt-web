@@ -14,12 +14,14 @@ class PollData {
   final String question;
   final String category;
   final String topic;
+  final String tier;
 
   const PollData({
     required this.id,
     required this.question,
     required this.category,
     required this.topic,
+    required this.tier,
   });
 
   factory PollData.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -29,6 +31,7 @@ class PollData {
       question: d['question'] as String? ?? '',
       category: d['category'] as String? ?? '',
       topic:    d['topic']    as String? ?? '',
+      tier:     d['tier']     as String? ?? 'pulse',
     );
   }
 }
@@ -180,6 +183,7 @@ class _PulseScreenState extends State<PulseScreen> {
                             return PollCard(
                               question: poll.question,
                               category: poll.category,
+                              tier: poll.tier,
                               onTap: () => _openRecording(poll.question, poll.id),
                               onViewResonance: () => _viewResonance(poll.id),
                             );

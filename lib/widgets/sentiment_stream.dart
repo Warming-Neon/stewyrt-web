@@ -109,7 +109,7 @@ class SentimentStream extends StatelessWidget {
               Container(
                 width: 6, height: 6,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFF3B30), shape: BoxShape.circle,
+                  color: Color(0xFF00BFA5), shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 8),

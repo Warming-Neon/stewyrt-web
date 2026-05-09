@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 class PollCard extends StatelessWidget {
   final String question;
   final String category;
+  final String tier;
   final VoidCallback onTap;
   final VoidCallback? onViewResonance;
 
@@ -12,9 +13,18 @@ class PollCard extends StatelessWidget {
     super.key,
     required this.question,
     required this.category,
+    required this.tier,
     required this.onTap,
     this.onViewResonance,
   });
+
+  String get _label {
+    switch (tier) {
+      case 'horizon':     return 'HORIZON';
+      case 'icebreaker':  return 'ICE BREAKER';
+      default:            return 'THE PULSE';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -46,7 +56,7 @@ class PollCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
-                category.toUpperCase(),
+                _label,
                 style: GoogleFonts.spaceGrotesk(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,

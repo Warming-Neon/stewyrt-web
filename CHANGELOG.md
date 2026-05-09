@@ -5,6 +5,23 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-09] — UI polish: nav 'S' logo, card tier labels, teal live dot, debug overlay removed
+
+### Flutter client
+- **`lib/main.dart`**: first nav tab icon replaced with a Space Grotesk bold 'S'; label changed from 'The Pulse' to 'Stewyrt'. `_NavItem` accepts optional `iconWidget` that overrides the `Icon` when provided.
+- **`lib/screens/pulse_screen.dart`**: `PollData` gains a `tier` field (read from `polls/{id}['tier']`, defaults to `'pulse'`). Passed through to `PollCard`.
+- **`lib/widgets/poll_card.dart`**: `tier` parameter added; card header label derived from tier — `horizon` → **HORIZON**, `icebreaker` → **ICE BREAKER**, anything else → **THE PULSE**. `category` field still stored but no longer shown on the card.
+- **`lib/widgets/sentiment_stream.dart`**: live indicator dot colour changed from red `#FF3B30` to teal `#00BFA5`. Dot is static (always on while the feed panel is visible — no real-time activity signal wired yet).
+
+### Brain visualiser
+- **`web/brain_visualizer.html`**: removed on-screen debug overlay entirely — `#dbg` CSS block, `<div id="dbg">` element, `_dbgEl`/`_dbgLines` variables and overlay-update code all deleted. `dbg()` now forwards to `console.log` only (intentional — native WebView mirrors `[BRAIN]` logs to Flutter debug console via `setOnConsoleMessage`).
+
+### Firestore — manual actions required
+- Existing horizon poll doc: add `tier: "horizon"` field so the card shows **HORIZON**.
+- Filler question: add new `polls` doc — `{ question: "What harmless things do you do that are bad but make you feel good?", category: "confessional", topic: "harmless pleasures", tier: "pulse", isActive: true, total_submissions: 0 }`.
+
+---
+
 ## [2026-05-09] — Week 1–4 question library, question scheduler deployed
 
 ### Scripts

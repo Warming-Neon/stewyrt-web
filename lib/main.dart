@@ -95,8 +95,17 @@ class _RootShellState extends State<RootShell> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     _NavItem(
-                      label: 'The Pulse',
+                      label: 'Stewyrt',
                       icon: Icons.graphic_eq_rounded,
+                      iconWidget: Text(
+                        'S',
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: _selectedIndex == 0 ? textColor : subColor,
+                          height: 1,
+                        ),
+                      ),
                       selected: _selectedIndex == 0,
                       textColor: textColor,
                       subColor: subColor,
@@ -151,6 +160,7 @@ class _RootShellState extends State<RootShell> {
 class _NavItem extends StatelessWidget {
   final String label;
   final IconData icon;
+  final Widget? iconWidget;
   final bool selected;
   final Color textColor;
   final Color subColor;
@@ -159,6 +169,7 @@ class _NavItem extends StatelessWidget {
   const _NavItem({
     required this.label,
     required this.icon,
+    this.iconWidget,
     required this.selected,
     required this.textColor,
     required this.subColor,
@@ -176,7 +187,7 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 22),
+            iconWidget ?? Icon(icon, color: color, size: 22),
             const SizedBox(height: 4),
             Text(
               label,
