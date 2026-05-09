@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ── audio_uploads/ ─────────────────────────────────────────────────────────
+    match /audio_uploads/{fileName} {
+
+      // Authenticated clients may upload audio files only.
+      // Enforces: must be authenticated, file must be audio/*, size under 5 MB.
+      // File extension (.m4a) cannot be enforced in Storage rules alone —
+      // the content-type check is the meaningful guard.
+      allow write: if request.auth != null
+                      && request.resource.contentType.matches('audio/.*')
+                      && request.resource.size <= 5 * 1024 * 1024;
+
+      // Authenticated users can play feed audio. This enables enumeration/download
+      // of all audio files, creating potential bandwidth costs if abused.
+      // Mitigation: Firebase bandwidth limits + App Check (Phase 8).
+      allow read:  if request.auth != null;
+    }
+
+    // ── catch-all ──────────────────────────────────────────────────────────────
+    // Deny access to any path not explicitly covered.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

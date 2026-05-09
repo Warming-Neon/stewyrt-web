@@ -5,6 +5,48 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-09] — Cost & security hardening: verification rate limiting, metadata trust removal
+
+### Cloud Functions (`functions/src/index.ts`)
+- **Verification rate limit (FIX 1):** `analyzeAudio` now enforces 3 verification attempts per 24h per UID before invoking Gemini. Reads `verificationWindowStart` + `verificationAttempts` from `users/{uid}`; blocks and deletes audio without a Gemini call if limit is exceeded. Writes `{ verifiedAsHuman: false, verificationNote: "Rate limit exceeded..." }` and logs a `system_logs` entry with `type: "verification_rate_limit"`. Both success and error write paths now persist the counter fields, advancing the window on each real attempt.
+- **Remove `metadata["owner"]` trust surface (FIX 2):** `extractUidForRateLimit` no longer accepts or trusts client-supplied `metadata["owner"]` as a UID source. UID is derived server-side from `responseId` in production mode only; client metadata is never trusted for routing. Documented with an explicit comment.
+
+### Storage (`storage.rules`)
+- **Comment update (FIX 3):** Added bandwidth-risk + App Check mitigation comment above the `audio_uploads/` read rule per audit recommendation.
+
+---
+
+## [2026-05-09] — Security migration: locked rules, bot detection, 120-day audio purge
+
+### Security & Rules
+- **Firestore rules** (`firestore.rules`): all client writes denied; reads scoped to authenticated users with `blocked != true`; `polls`, `responses`, `users`, `system_logs` collections explicitly locked; catch-all deny
+- **Storage rules** (`storage.rules`): `audio_uploads/` restricted to authenticated writes of `audio/*` ≤ 5MB; catch-all deny
+- **Firestore indexes** (`firestore.indexes.json`): 5 composite indexes for `responses` covering Pulse, Resonance, and Global Thread queries with `blocked` filter
+- **Backfill**: `scripts/backfill_blocked_field.ts` created and run — 12 existing approved response docs stamped with `blocked: false` so `isNotEqualTo: true` queries don't exclude them
+
+### Cloud Functions (`functions/src/index.ts`)
+- **`analyzeAudio`**: all client writes moved to Admin SDK; `blocked: false` written explicitly on every approved response; UUID v4 validation of `responseId`; `pollId` existence check; rate limiting via `count()` aggregation (5 responses/user/hour)
+- **Verification flow** overhauled: Gemini prompt changed from demographic acoustic matching to bot detection (continuous human speech check only); output fields changed from `confidenceScore/isFlagged` to `verifiedAsHuman/isContinuousSpeech/durationSeconds/verificationNote`; demographic data no longer inferred from voice
+- **`purgeOldSentimentAudio`** (new): `onSchedule("0 3 * * *")`; deletes `audio_uploads/` files older than 120 days; skips `onboarding_*`; writes audit summary to `system_logs/{YYYY-MM-DD}`
+- **`submitSelfReportedDemographics`** (new): `onCall`; validates age/gender/ethnicity/region against constrained ALLOWED arrays (UN subregions); writes with `merge: true` to `users/{uid}`
+
+### Flutter Client
+- All `responses` queries updated with `.where('blocked', isNotEqualTo: true)`: `sentiment_stream.dart`, `resonance_web_screen.dart`, `resonance_native_screen.dart`, `global_thread_screen.dart` (compound `Filter.and`)
+- `recording_sheet.dart`: removed client-side Firestore `cloud_firestore` import and `.delete()` call — CF uses `tx.set()` atomically
+- `storage_service.dart`: `uploadOnboardingAudio` — removed 4 demographic named params; metadata simplified to `contentType: audio/mp4` only
+- `firestore_service.dart`: `listenForVerification` check updated from `isFlagged == true` → `verifiedAsHuman == false`
+- `onboarding_screen.dart`: rewritten — bot detection flow (hold button, say anything); self-reported demographics collected separately; fire-and-forget `submitSelfReportedDemographics` callable after verification; consent copy updated to reflect no demographic inference from voice
+- `pubspec.yaml`: added `cloud_functions: ^5.0.0`
+
+### Privacy Policy
+- `web/privacy.html`: audio lifecycle section rewritten to distinguish verification (immediate delete, bot detection only) from sentiment audio (120-day retention); GDPR Art. 17 right to early deletion added; Art. 22 automated decision-making section updated — removed demographic AI classification, now discloses bot detection + sentiment classification; contact email updated to `privacy@stewyrt.com`
+
+### Config & Housekeeping
+- `firebase.json`: added `firestore` and `storage` sections referencing new rules/indexes files
+- `.gitignore`: added `functions/lib/`, `.firebase/`, `.env`/`*.env`/`functions/.env`, `service-account*.json`, `*.keystore`, `ios/Pods/`
+
+---
+
 ## [2026-05-09] — Legal overhaul, web platform compatibility, security patches
 
 ### Legal & Compliance

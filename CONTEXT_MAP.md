@@ -23,15 +23,17 @@ Stewyrt is an anonymous, audio-only social sentiment platform. Users record shor
 ```
 stewyrt/
 ├── lib/
-│   ├── main.dart                         — App entry, RootShell, bottom nav
+│   ├── main.dart                         — App entry, RootShell, three-tab bottom nav
 │   ├── firebase_options.dart             — Generated Firebase config
 │   │
 │   ├── screens/
 │   │   ├── pulse_screen.dart             — Tab 1: swipeable polls + live feed (The Pulse)
-│   │   ├── zeitgeist_screen.dart         — Tab 2: platform router (loads web or native screen)
-│   │   ├── zeitgeist_web_screen.dart     — Tab 2 web: 3D brain (The Resonance) via HtmlElementView iframe
-│   │   ├── zeitgeist_native_screen.dart  — Tab 2 iOS/Android: 3D brain (The Resonance) via webview_flutter
-│   │   ├── onboarding_screen.dart        — Demographics collection + voice verification
+│   │   ├── resonance_screen.dart         — Tab 2: platform router (loads web or native screen)
+│   │   ├── resonance_web_screen.dart     — Tab 2 web: 3D brain (The Resonance) via HtmlElementView iframe
+│   │   ├── resonance_native_screen.dart  — Tab 2 iOS/Android: 3D brain (The Resonance) via webview_flutter
+│   │   ├── archive_screen.dart           — Tab 3: library of past/closed polls (The Archive)
+│   │   ├── global_thread_screen.dart     — Drill-down: all responses for a specific emotion tag
+│   │   ├── onboarding_screen.dart        — Bot-detection verification + self-reported demographics
 │   │   └── day_one_screen.dart           — Standalone first-question screen
 │   │
 │   ├── widgets/
@@ -47,7 +49,7 @@ stewyrt/
 │   │   ├── upload_bytes_io.dart          — Native impl: File.readAsBytes()
 │   │   ├── upload_bytes_web.dart         — Web impl: fetch() + arrayBuffer() via dart:js_interop
 │   │   ├── auth_service.dart             — signInAnonymously()
-│   │   └── zeitgeist_controller.dart     — Static coordinator: tab switching + focus callbacks
+│   │   └── resonance_controller.dart     — Static coordinator: tab switching + focus callbacks
 │   │
 │   ├── models/
 │   │   └── sentiment_data.dart           — Mock/seed sentiment data
@@ -69,11 +71,17 @@ stewyrt/
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Function: analyzeAudio (Storage trigger)
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics
+│
+├── scripts/
+│   └── backfill_blocked_field.ts         — One-shot backfill: stamps blocked=false on pre-migration approved responses
 │
 ├── assets/
 │   └── icon/stewyrt_icon.png
 │
+├── firestore.rules                        — Firestore security rules (client read-only, CF writes via Admin SDK)
+├── storage.rules                          — Storage security rules (auth + audio/* + 5MB cap)
+├── firestore.indexes.json                 — Composite indexes for blocked-filter queries
 ├── pubspec.yaml
 ├── analysis_options.yaml
 └── firebase.json
@@ -83,37 +91,41 @@ stewyrt/
 
 ## Navigation & Shell
 
-`main.dart` → `RootShell` → `IndexedStack` with two tabs:
+`main.dart` → `RootShell` → `IndexedStack` with three tabs:
 
 | Index | Label | Screen |
 |-------|-------|--------|
 | 0 | The Pulse | `PulseScreen` |
-| 1 | The Zeitgeist | `ZeitgeistScreen` (routes to web or native internally) |
+| 1 | The Resonance | `ResonanceScreen` (routes to web or native internally) |
+| 2 | The Archive | `ArchiveScreen` |
 
-`_screens` uses `const ZeitgeistScreen()` for both platforms. The routing happens inside `zeitgeist_screen.dart` via a conditional import — **not** via `kIsWeb` in `main.dart`.
+`_screens` uses `const ResonanceScreen()` for both platforms. The routing happens inside `resonance_screen.dart` via a conditional import — **not** via `kIsWeb` in `main.dart`.
 
-Bottom nav: centred tab pair + right-side theme toggle icon. Theme state via `ThemeNotifier` (Provider).
+Bottom nav: three tabs + right-side theme toggle icon. Theme state via `ThemeNotifier` (Provider).
 
-`ZeitgeistController` is a static service registered in `_RootShellState.initState()`:
+`ResonanceController` is a static service registered in `_RootShellState.initState()`:
 - `registerTabSwitcher(fn)` — called by `RootShell` to allow any screen to switch tabs
 - `registerFocus(fn)` / `unregisterFocus()` — called by the active Resonance screen
 - `goToZeitgeistAndFocus(tag)` — public API: switches to tab 1 then fires the focus callback
 
-Tapping a Tone/Flavor/Essence chip in the Pulse feed calls `ZeitgeistController.goToZeitgeistAndFocus(word)`, which switches to The Resonance and camera-tweens to that synapse.
+Tapping a Tone/Flavor/Essence chip in the Pulse feed calls `ResonanceController.goToZeitgeistAndFocus(word)`, which switches to The Resonance and camera-tweens to that synapse.
 
 ---
 
-## Platform Router (`zeitgeist_screen.dart`)
+## Platform Router (`resonance_screen.dart`)
 
 ```dart
 import 'package:flutter/material.dart';
-import 'zeitgeist_native_screen.dart'
-    if (dart.library.js_interop) 'zeitgeist_web_screen.dart';
+import 'resonance_native_screen.dart'
+    if (dart.library.js_interop) 'resonance_web_screen.dart';
 
-class ZeitgeistScreen extends StatelessWidget {
-  const ZeitgeistScreen({super.key});
+class ResonanceScreen extends StatelessWidget {
+  const ResonanceScreen({super.key, this.pollId, this.initialFocusTag});
+  final String? pollId;
+  final String? initialFocusTag;
   @override
-  Widget build(BuildContext context) => const ZeitgeistPlatformScreen();
+  Widget build(BuildContext context) =>
+      ResonancePlatformScreen(pollId: pollId, initialFocusTag: initialFocusTag);
 }
 ```
 
@@ -162,11 +174,14 @@ Open in any browser at `http://localhost:8080`.
 | `question` | String | Poll question text |
 | `pollId` | String | Parent poll document ID |
 | `language` | String | ISO 639-1 code detected by Gemini (e.g. `"en"`, `"es"`, `"fr"`); defaults to `"en"` |
-| `blocked` | Boolean | `true` if content moderation triggered |
-| `blockedReason` | String | e.g. `"content_policy"` |
+| `blocked` | Boolean | Always present: `false` for approved, `true` if moderation triggered. **Never absent** — required for Firestore `isNotEqualTo` queries. |
+| `blockedReason` | String | e.g. `"content_policy"` (only on blocked docs) |
+| `uid` | String | Firebase Auth UID (present when derivable from responseId) |
 | `createdAt` | Timestamp | Server timestamp |
 
 **Note:** All three `*Region` fields carry the same value as `anatomicalRegion`. The Flutter aggregator votes across many responses per question to find the dominant region for each recurring emotion word.
+
+**Note:** All client queries on `responses` must include `.where('blocked', isNotEqualTo: true)` — Firestore rejects queries that could return docs the security rule would deny.
 
 ### `polls` collection
 | Field | Type | Notes |
@@ -181,35 +196,67 @@ Open in any browser at `http://localhost:8080`.
 | `counts.flavor.*` | Number | Per-word flavor counts |
 | `counts.essence.*` | Number | Per-word essence counts |
 
-### `users` collection (onboarding verification)
+### `users` collection (onboarding verification + demographics)
 | Field | Type | Notes |
 |-------|------|-------|
-| `claimedAge/Gender/Ethnicity/Region` | String | Self-reported demographics |
-| `confidenceScore` | Number | 0–100 acoustic match score |
-| `isFlagged` | Boolean | True if Gemini suspects bot/mismatch |
+| `verifiedAsHuman` | Boolean | `true` if Gemini detected continuous human speech |
+| `isContinuousSpeech` | Boolean | Whether the recording was uninterrupted speech |
+| `durationSeconds` | Number | Audio duration in seconds |
 | `verificationNote` | String | 1-sentence Gemini explanation |
-| `verifiedAt` | Timestamp | |
+| `verifiedAt` | Timestamp | When verification completed |
+| `verificationAttempts` | Number | Count of verification attempts in the current 24h window |
+| `verificationWindowStart` | Timestamp | Start of the current 24h rate-limit window |
+| `selfReportedAge` | String | Self-reported age group (e.g. `"25-34"`) |
+| `selfReportedGender` | String | Self-reported gender (e.g. `"Female"`) |
+| `selfReportedEthnicity` | String | Self-reported ethnicity |
+| `selfReportedRegion` | String | Self-reported UN subregion (e.g. `"Northern Europe"`) |
+| `selfReportedAt` | Timestamp | When demographics were submitted |
+
+Demographics are **self-reported** only — never inferred from voice. Written by `submitSelfReportedDemographics` CF after verification completes (note: CF receives `age/gender/ethnicity/region` as param names; stores them with `selfReported*` prefix). All writes are Admin SDK only; no client writes permitted.
+
+### `system_logs` collection (purge audit trail)
+| Field | Type | Notes |
+|-------|------|-------|
+| `deletedCount` | Number | Files deleted in this run |
+| `errorCount` | Number | Files that failed deletion |
+| `errors` | Array | Error messages for failed deletes |
+| `cutoffDate` | Timestamp | 120-day cutoff used |
+| `ranAt` | Timestamp | When the purge ran |
+
+Doc ID is `YYYY-MM-DD`. Written by `purgeOldSentimentAudio` daily. No client access.
 
 ### Storage paths
-- `audio_uploads/<uuid>.m4a` — poll responses
-- `audio_uploads/onboarding_<uuid>.m4a` — verification clips (deleted after processing)
+- `audio_uploads/<uuid>.m4a` — poll responses; retained **up to 120 days** then auto-purged
+- `audio_uploads/onboarding_<uuid>.m4a` — verification clips; deleted immediately after CF processing (never persisted to disk)
 
 ---
 
 ## Firestore Query Rules (STRICT)
 
+**Every query on `responses` MUST include `.where('blocked', isNotEqualTo: true)`.** Firestore security rules deny reads on blocked docs; Firestore will reject any query that could return a denied document.
+
 **The Resonance query MUST always be scoped to a specific poll. Never query `responses` globally.**
 
 ```dart
+// The Resonance
 FirebaseFirestore.instance
   .collection('responses')
   .where('pollId', isEqualTo: currentPollId)
+  .where('blocked', isNotEqualTo: true)
   .orderBy('createdAt', descending: true)
   .limit(300)
   .snapshots()
+
+// The Pulse (global stream)
+FirebaseFirestore.instance
+  .collection('responses')
+  .where('blocked', isNotEqualTo: true)
+  .orderBy('createdAt', descending: true)
+  .limit(30)
+  .snapshots()
 ```
 
-The live feed (The Pulse) uses limit 30 without a `pollId` filter (it shows the global stream). The Resonance always uses limit 300 with a `pollId` filter.
+The Pulse uses limit 30 without a `pollId` filter. The Resonance always uses limit 300 with a `pollId` filter. The Global Thread screen uses `Filter.and(Filter.or(...), Filter('blocked', isNotEqualTo: true))` for compound queries.
 
 ---
 
@@ -243,20 +290,23 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 
 ---
 
-## Cloud Function: `analyzeAudio` (`functions/src/index.ts`)
+## Cloud Functions (`functions/src/index.ts`)
+
+### `analyzeAudio` — Storage trigger
 
 **Trigger:** `onObjectFinalized` on `audio_uploads/` in `stewyrt-11.firebasestorage.app`
 
 **Routing on filename prefix:**
-- `onboarding_*` → Demographic Acoustic Verification flow
+- `onboarding_*` → Bot Detection (Verification) flow
 - Everything else → Sentiment Analysis flow
 
 **Sentiment flow:**
-1. Download file to `/tmp/`
-2. Base64-encode and send to `gemini-2.5-flash` with a structured prompt
-3. Content moderation check first — if `blocked: true` returned, write `{ blocked: true, blockedReason: "content_policy" }` to `responses/{responseId}` and exit
-4. Otherwise, run transaction: write full analysis to `responses/{responseId}` + increment `polls/{pollId}` counters
-5. Delete temp file
+1. Validate `responseId` (UUID v4 regex) and `pollId` (Firestore existence check)
+2. Rate-limit: count responses from same UID in past hour via `count()` aggregation; reject if ≥ 30 (skipped in beta mode where responseId is UUID v4 — no reliable UID available)
+3. Download file to `/tmp/`, base64-encode, send to `gemini-2.5-flash`
+4. Content moderation check — if blocked, write `{ blocked: true, blockedReason: "content_policy" }` and exit
+5. Run Firestore transaction: write full analysis to `responses/{responseId}` with `blocked: false`; increment `polls/{pollId}` counters
+6. Delete temp file
 
 **Gemini prompt steps (sentiment):**
 1. `tone` — single-word overarching emotional state
@@ -269,18 +319,43 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
    - **Nucleus:** reward, hope, joy, inspiration, gratitude, positive motivation
    - **Insula:** disgust, numbness, deep melancholy, alienation, visceral unease
 
-**Expected JSON from Gemini:**
-```json
-{ "tone": "Word", "flavor": "Word", "essence": "Word", "summary": "Content headline", "anatomicalRegion": "Region" }
-```
-
-**Verification flow:**
+**Bot Detection (Verification) flow:**
 1. Same audio ingest
-2. Gemini acoustic check against claimed age/gender
-3. Delete audio from bucket immediately (consent promise)
-4. Write `{ confidenceScore, isFlagged, verificationNote, ... }` to `users/{uuid}`
+2. Rate-limit check: read `users/{uid}`, check `verificationWindowStart` + `verificationAttempts`; reject if ≥ 3 attempts in past 24h — writes `{ verifiedAsHuman: false, verificationNote: "Rate limit exceeded..." }`, logs `system_logs` entry with `type: "verification_rate_limit"`, deletes audio
+3. Gemini checks for presence of continuous human speech (NOT demographic inference)
+4. Delete audio from bucket immediately — `finally` block guarantees deletion on success and error
+5. Write `{ verifiedAsHuman, isContinuousSpeech, durationSeconds, verificationNote, verifiedAt, verificationAttempts, verificationWindowStart }` to `users/{uid}`
 
 **Secret:** `GEMINI_API_KEY` in Google Cloud Secret Manager
+
+---
+
+### `purgeOldSentimentAudio` — Scheduled function
+
+**Schedule:** `onSchedule("0 3 * * *")` — daily at 03:00 UTC
+
+**Logic:**
+1. List all files in `audio_uploads/`
+2. Skip `onboarding_*` files (already deleted post-verification, but defensive check)
+3. Delete any file whose `timeCreated` is older than 120 days
+4. Write summary `{ deletedCount, errorCount, errors, cutoffDate, ranAt }` to `system_logs/{YYYY-MM-DD}`
+
+---
+
+### `submitSelfReportedDemographics` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Require authenticated caller (`request.auth`)
+2. Validate `age`, `gender`, `ethnicity`, `region` against constrained `ALLOWED_*` arrays (Title Case)
+3. Write with `merge: true` to `users/{uid}`
+
+**ALLOWED arrays:**
+- Ages: `"18-24"` through `"65+"` + `"Prefer not to say"`
+- Genders: `Male`, `Female`, `Non-Binary`, `Prefer not to say`
+- Ethnicities: `Asian`, `Black or African`, `Hispanic/Latino`, `White`, `Mixed`, `Other`, `Prefer not to say`
+- Regions: 13 UN geoscheme subregions (Northern/Western/Southern/Eastern Europe, North America, Latin America, MENA, Sub-Saharan Africa, South/East/Southeast Asia, Oceania) + `Prefer not to say`
 
 ---
 
@@ -299,7 +374,7 @@ idle → recording → previewing → waiting → results
 - **results:** staggered `AnimatedOpacity` reveal — tone (0ms), flavor (400ms), essence (800ms), summary (1400ms), Done button (1900ms)
 - **blocked:** moderation rejection with community guidelines text
 
-**Production toggle:** `_kProductionMode` (currently `false`). When `true`: one response per user per poll, old doc deleted before listener attaches to prevent stale-result bug.
+**Production toggle:** `_kProductionMode` (currently `false`). When `true`: one response per user per poll. No client-side delete — the Cloud Function uses `tx.set()` which overwrites any existing document atomically, eliminating the stale-result race.
 
 ---
 
@@ -319,11 +394,22 @@ On web, a compliance `SnackBar` is shown via `addPostFrameCallback` — summaris
 
 ## Onboarding Screen (`onboarding_screen.dart`)
 
-Demographics collection + voice verification. Age gate: **18 years or older**.
+Bot-detection verification + self-reported demographics collection. Age gate: **18 years or older**.
+
+**Flow:**
+1. User fills in self-reported age, gender, ethnicity, region (dropdowns — not inferred from voice)
+2. Consent checkboxes: ToS/Privacy + explicit audio consent for bot detection only
+3. User holds button and says a few words — any speech, not a scripted phrase
+4. `StorageService.uploadOnboardingAudio(path, uid)` — no demographic params in metadata
+5. `FirestoreService.listenForVerification(uid)` waits for `verifiedAsHuman` field
+6. On success: fire-and-forget `submitSelfReportedDemographics` callable with the four dropdown values
+7. Navigate to `DayOneScreen`
 
 Consent checkboxes use `InlineSpan` labels (`_SharpCheckbox` takes `InlineSpan`, not `String`). The Terms of Service and Privacy Policy labels are tappable links — `TapGestureRecognizer` opens `stewyrt.com/terms.html` and `stewyrt.com/privacy.html` via `url_launcher`. Recognizers are disposed in `dispose()`.
 
 Audio path: `kIsWeb ? '' : getTemporaryDirectory().path/onboarding_<ts>.m4a`. Web uses the empty-path fetch path in `upload_bytes_web.dart`.
+
+The `submitSelfReportedDemographics` call uses `.then<void>((_) {}, onError: ...)` (not `.catchError`) to avoid the `FutureOr<HttpsCallableResult>` return-type constraint.
 
 ---
 
@@ -348,9 +434,9 @@ Audio path: `kIsWeb ? '' : getTemporaryDirectory().path/onboarding_<ts>.m4a`. We
 - Logs progress every 25%
 - Returns download URL
 
-**`uploadOnboardingAudio(localPath, uuid, { claimedAge, claimedGender, claimedEthnicity, claimedRegion })`**
-- Uploads to `audio_uploads/onboarding_<uuid>.m4a`
-- No download URL returned (file deleted by Cloud Function after verification)
+**`uploadOnboardingAudio(localPath, uid)`**
+- Uploads to `audio_uploads/onboarding_<uid>.m4a` with `contentType: audio/mp4` only — no demographic metadata
+- No download URL returned (file deleted by Cloud Function immediately after bot-detection processing)
 
 ---
 
@@ -499,6 +585,7 @@ window.addEventListener('message', e => { processBrainData(typeof e.data === 'st
 | `firebase_auth ^5.0.0` | Anonymous auth |
 | `firebase_storage ^12.0.0` | Audio upload |
 | `firebase_core ^3.0.0` | Init |
+| `cloud_functions ^5.0.0` | Callable Cloud Functions (`submitSelfReportedDemographics`) |
 | `record ^5.1.2` | Mic recording (AAC-LC, 128kbps, 44.1kHz mono) |
 | `just_audio ^0.9.40` | Playback |
 | `google_fonts ^6.2.1` | Space Grotesk |
