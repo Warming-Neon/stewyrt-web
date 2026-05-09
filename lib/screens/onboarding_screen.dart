@@ -445,7 +445,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ? null
                     : (v) => setState(() => _confirmedAge = v),
                 label: const TextSpan(
-                  text: 'I confirm I am 16 years of age or older.',
+                  text: 'I confirm I am 18 years of age or older.',
                 ),
               ),
               const SizedBox(height: 16),
