@@ -129,6 +129,7 @@ class FirestoreService {
     });
 
     sub = docRef.snapshots().listen((snap) {
+      debugPrint('[STEWYRT][VERIFY] Snapshot — exists: ${snap.exists} | data: ${snap.data()}');
       if (!snap.exists) return;
       final data = snap.data();
       if (data == null || !data.containsKey('verifiedAt')) return;

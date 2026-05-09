@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -161,8 +162,9 @@ class _RecordingSheetState extends State<RecordingSheet> {
       return;
     }
 
-    final dir  = await getTemporaryDirectory();
-    final path = '${dir.path}/rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final path = kIsWeb
+        ? ''
+        : '${(await getTemporaryDirectory()).path}/rec_${DateTime.now().millisecondsSinceEpoch}.m4a';
     debugPrint('[STEWYRT][RECORD] Recording to: $path');
 
     await _recorder.start(

@@ -1,7 +1,10 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
@@ -64,6 +67,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   int _phraseIndex = 0;
   Timer? _phraseTimer;
 
+  // ── Link recognizers ──────────────────────────────────────────────────────
+  late final TapGestureRecognizer _termsRecognizer;
+  late final TapGestureRecognizer _privacyRecognizer;
+
   // ── Shake animation (invalid tap feedback) ────────────────────────────────
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnimation;
@@ -92,6 +99,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void initState() {
     super.initState();
 
+    _termsRecognizer = TapGestureRecognizer()
+      ..onTap = () => _openUrl('https://stewyrt.com/terms.html');
+    _privacyRecognizer = TapGestureRecognizer()
+      ..onTap = () => _openUrl('https://stewyrt.com/privacy.html');
+
     _shakeController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 420),
@@ -107,6 +119,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   void dispose() {
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
     _shakeController.dispose();
     _maxDurationTimer?.cancel();
     _ampSub?.cancel();
@@ -126,6 +140,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _confirmedAge &&
       _consentRecording &&
       _agreedTerms;
+
+  // ── URL launcher ──────────────────────────────────────────────────────────
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      debugPrint('[STEWYRT][ONBOARDING] Could not launch $url');
+    }
+  }
 
   // ── Error feedback ────────────────────────────────────────────────────────
 
@@ -156,9 +179,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
 
-    final dir = await getTemporaryDirectory();
-    final filePath =
-        '${dir.path}/onboarding_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final filePath = kIsWeb
+        ? ''
+        : '${(await getTemporaryDirectory()).path}/onboarding_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
     await _recorder.start(
       const RecordConfig(
@@ -231,7 +254,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _liveSamples.clear();
     });
 
-    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() { _isRecording = false; _liveSamples.clear(); });
+      return;
+    }
+    final uid = user.uid;
 
     try {
       await StorageService.uploadOnboardingAudio(
@@ -416,7 +444,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 onChanged: _isRecording || _isUploading
                     ? null
                     : (v) => setState(() => _confirmedAge = v),
-                label: 'I confirm I am 16 years of age or older.',
+                label: const TextSpan(
+                  text: 'I confirm I am 16 years of age or older.',
+                ),
               ),
               const SizedBox(height: 16),
               _SharpCheckbox(
@@ -424,9 +454,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 onChanged: _isRecording || _isUploading
                     ? null
                     : (v) => setState(() => _consentRecording = v),
-                label:
-                    'I consent to my voice being recorded and processed by AI. '
-                    'I understand the audio file is permanently destroyed immediately after analysis.',
+                label: const TextSpan(
+                  text: 'I consent to my voice being recorded and processed by AI. '
+                      'I understand the audio file is permanently destroyed immediately after analysis.',
+                ),
               ),
               const SizedBox(height: 16),
               _SharpCheckbox(
@@ -434,9 +465,33 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 onChanged: _isRecording || _isUploading
                     ? null
                     : (v) => setState(() => _agreedTerms = v),
-                label:
-                    'I agree to the Terms of Service and Privacy Policy, and understand my '
-                    'anonymized demographic data will be aggregated and monetized.',
+                label: TextSpan(
+                  children: [
+                    const TextSpan(text: 'I agree to the '),
+                    TextSpan(
+                      text: 'Terms of Service',
+                      style: const TextStyle(
+                        color: Color(0xFF00FFCC),
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFF00FFCC),
+                      ),
+                      recognizer: _termsRecognizer,
+                    ),
+                    const TextSpan(text: ' and '),
+                    TextSpan(
+                      text: 'Privacy Policy',
+                      style: const TextStyle(
+                        color: Color(0xFF00FFCC),
+                        decoration: TextDecoration.underline,
+                        decorationColor: Color(0xFF00FFCC),
+                      ),
+                      recognizer: _privacyRecognizer,
+                    ),
+                    const TextSpan(
+                      text: ', and understand my anonymized demographic data will be aggregated and monetized.',
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 48),
               _buildHoldButton(),
@@ -713,7 +768,7 @@ class _SharpCheckbox extends StatelessWidget {
 
   final bool value;
   final ValueChanged<bool>? onChanged;
-  final String label;
+  final InlineSpan label;
 
   @override
   Widget build(BuildContext context) {
@@ -746,7 +801,7 @@ class _SharpCheckbox extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
+              child: Text.rich(
                 label,
                 style: GoogleFonts.spaceGrotesk(
                   fontSize: 13,

@@ -43,12 +43,16 @@ Stream<List<PollData>> _pollsStream({String? filterPollId}) {
         .snapshots()
         .map((doc) => doc.exists ? [PollData.fromFirestore(doc)] : <PollData>[]);
   }
+  debugPrint('[STEWYRT][PULSE] Attaching polls stream');
   return FirebaseFirestore.instance
       .collection('polls')
       .where('isActive', isEqualTo: true)
-      .orderBy('createdAt')
+      .orderBy('createdAt', descending: true)
       .snapshots()
-      .map((snap) => snap.docs.map(PollData.fromFirestore).toList());
+      .map((snap) {
+        debugPrint('[STEWYRT][PULSE] polls snapshot — ${snap.docs.length} docs');
+        return snap.docs.map(PollData.fromFirestore).toList();
+      });
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -132,6 +136,7 @@ class _PulseScreenState extends State<PulseScreen> {
 
                 // ── Error ──────────────────────────────────────────────────
                 if (snapshot.hasError) {
+                  debugPrint('[STEWYRT][PULSE] polls stream ERROR: ${snapshot.error}');
                   return _ErrorView(message: snapshot.error.toString());
                 }
 

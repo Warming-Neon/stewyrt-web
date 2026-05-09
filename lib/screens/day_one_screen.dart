@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -143,8 +144,9 @@ class _DayOneScreenState extends State<DayOneScreen> {
       return;
     }
 
-    final dir  = await getTemporaryDirectory();
-    final path = '${dir.path}/d1_${DateTime.now().millisecondsSinceEpoch}.m4a';
+    final path = kIsWeb
+        ? ''
+        : '${(await getTemporaryDirectory()).path}/d1_${DateTime.now().millisecondsSinceEpoch}.m4a';
 
     await _recorder.start(
       const RecordConfig(
@@ -516,7 +518,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
                 child: AnimatedOpacity(
                   opacity: _showTone ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 500),
-                  child: const _TagChip(label: 'TONE',    bg: chipBg, fg: fg, sub: sub),
+                  child: _TagChip(label: 'TONE', value: result.tone, bg: chipBg, fg: fg, sub: sub),
                 ),
               ),
               const SizedBox(width: 8),
@@ -524,7 +526,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
                 child: AnimatedOpacity(
                   opacity: _showFlavor ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 500),
-                  child: const _TagChip(label: 'FLAVOR',  bg: chipBg, fg: fg, sub: sub),
+                  child: _TagChip(label: 'FLAVOR', value: result.flavor, bg: chipBg, fg: fg, sub: sub),
                 ),
               ),
               const SizedBox(width: 8),
@@ -532,28 +534,10 @@ class _DayOneScreenState extends State<DayOneScreen> {
                 child: AnimatedOpacity(
                   opacity: _showEssence ? 1.0 : 0.0,
                   duration: const Duration(milliseconds: 500),
-                  child: const _TagChip(label: 'ESSENCE', bg: chipBg, fg: fg, sub: sub),
+                  child: _TagChip(label: 'ESSENCE', value: result.essence, bg: chipBg, fg: fg, sub: sub),
                 ),
               ),
-            ]
-            .asMap()
-            .entries
-            .map((e) {
-              final tags   = [result.tone, result.flavor, result.essence];
-              final labels = ['TONE', 'FLAVOR', 'ESSENCE'];
-              return Expanded(
-                child: AnimatedOpacity(
-                  opacity: [_showTone, _showFlavor, _showEssence][e.key] ? 1.0 : 0.0,
-                  duration: const Duration(milliseconds: 500),
-                  child: _TagChip(
-                    label: labels[e.key],
-                    value: tags[e.key],
-                    bg: chipBg, fg: fg, sub: sub,
-                  ),
-                ),
-              );
-            })
-            .toList(),
+            ],
           ),
           const SizedBox(height: 28),
           AnimatedOpacity(
