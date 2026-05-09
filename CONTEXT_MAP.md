@@ -71,9 +71,10 @@ stewyrt/
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual
 │
 ├── scripts/
+│   ├── seed_questions.js                 — Idempotent seed: populates questions collection; uses ../functions/node_modules/firebase-admin
 │   └── backfill_blocked_field.ts         — One-shot backfill: stamps blocked=false on pre-migration approved responses
 │
 ├── assets/
@@ -214,6 +215,50 @@ Open in any browser at `http://localhost:8080`.
 
 Demographics are **self-reported** only — never inferred from voice. Written by `submitSelfReportedDemographics` CF after verification completes (note: CF receives `age/gender/ethnicity/region` as param names; stores them with `selfReported*` prefix). All writes are Admin SDK only; no client writes permitted.
 
+### `questions` collection
+| Field | Type | Notes |
+|-------|------|-------|
+| `text` | String | Prompt shown to user |
+| `tier` | String | `"pulse"` (daily) or `"horizon"` (weekly) |
+| `category` | String | rebellion / reflective / confessional / provocative / whimsical / retrospective / anticipatory / existential |
+| `emotional_weight` | String | `"light"` / `"medium"` / `"heavy"` |
+| `day_affinity` | String\|null | Preferred day-of-week (`"monday"`…`"sunday"`) or `null` |
+| `cooldown_days` | Number | Minimum days before reuse (pulse=90, horizon=180) |
+| `status` | String | `"approved"` — only approved questions are scheduled |
+| `times_used` | Number | Incremented by scheduler on each assignment |
+| `last_used_date` | Timestamp\|null | Updated by scheduler |
+| `first_used_date` | Timestamp\|null | Set on first assignment |
+| `created_at` | Timestamp | Seed time |
+| `updated_at` | Timestamp | Last update |
+
+32 questions seeded (6 original + 26 Week 1–4). Composite index on `(tier ASC, status ASC)`.
+
+### `question_schedule` collection
+Doc ID is `YYYY-MM-DD`. Written by `scheduleUpcomingQuestions` / `scheduleUpcomingQuestionsManual`.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `pulse_question_id` | String\|null | ID of the assigned pulse question for this date |
+| `horizon_question_id` | String\|null | ID of the assigned horizon question (one per ISO week) |
+| `pulse_locked` | Boolean | If true, pulse assignment will not be overwritten on the next scheduler run |
+| `horizon_locked` | Boolean | If true, horizon assignment will not be overwritten |
+| `status` | String | `"needs_question"` if no pulse could be assigned (warning case only) |
+| `created_at` | Timestamp | First scheduler write |
+| `updated_at` | Timestamp | Last scheduler write |
+
+### `scheduling_log` collection
+Doc ID is ISO datetime with colons/dots replaced by hyphens (e.g. `2026-05-09T02-00-00`). Written by the scheduler after each run.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `run_at` | String | ISO datetime string |
+| `dates_processed` | Array | List of `YYYY-MM-DD` strings filled this run |
+| `assignments` | Object | `{ "YYYY-MM-DD": { pulse: id, horizon: id } }` map |
+| `warnings` | Array | Any dates that could not be filled |
+| `horizon_updated` | Boolean | Whether a new horizon question was assigned this run |
+| `horizon_question_id` | String\|null | The horizon question assigned (if any) |
+| `completed_at` | Timestamp | Server timestamp |
+
 ### `system_logs` collection (purge audit trail)
 | Field | Type | Notes |
 |-------|------|-------|
@@ -339,6 +384,31 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 2. Skip `onboarding_*` files (already deleted post-verification, but defensive check)
 3. Delete any file whose `timeCreated` is older than 120 days
 4. Write summary `{ deletedCount, errorCount, errors, cutoffDate, ranAt }` to `system_logs/{YYYY-MM-DD}`
+
+---
+
+### `scheduleUpcomingQuestions` — Scheduled function
+
+**Schedule:** `onSchedule("0 2 * * 0")` — every Sunday at 02:00 UTC
+
+**Logic (`runScheduler` core):**
+1. Fetch all approved `pulse` and `horizon` questions from `questions` collection
+2. For the next 14 days, skip any `question_schedule` date that is already locked
+3. Assign one pulse question per day using day-of-week category rotation:
+   - Mon=rebellion, Tue=reflective, Wed=confessional, Thu=provocative, Fri=whimsical, Sun=existential
+   - Saturday alternates retrospective (odd ISO week) / anticipatory (even ISO week)
+4. Pick best candidate: priority = (1) `day_affinity` match, (2) emotional balance (avoids 3+ consecutive heavy), (3) fewest `times_used`. Cooldown respected.
+5. Assign one horizon question per ISO week (shared across all 7 days of that week)
+6. Batch-write to `question_schedule/{YYYY-MM-DD}`, merge with existing docs
+7. Write run summary to `scheduling_log/{ISO-datetime}`
+
+---
+
+### `scheduleUpcomingQuestionsManual` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable). Requires Firebase Auth.
+
+**Logic:** Runs the same `runScheduler()` core as `scheduleUpcomingQuestions` and returns the full `SchedulerSummary` object so the caller can inspect assignments immediately. Use from Firebase Console → Functions → Test function.
 
 ---
 

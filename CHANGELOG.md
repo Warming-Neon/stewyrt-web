@@ -5,6 +5,29 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-09] — Week 1–4 question library, question scheduler deployed
+
+### Scripts
+- **`scripts/seed_questions.js`**: appended 26 new curated questions (Weeks 1–4 + 2 Horizon), covering categories rebellion, reflective, confessional, provocative, whimsical, retrospective, anticipatory, existential. 32 questions now live in Firestore `questions` collection.
+- **Bug fix:** `require` path corrected from `./functions/node_modules/firebase-admin` to `../functions/node_modules/firebase-admin` — path resolves relative to the file, not `process.cwd()`. The seed had never previously run successfully.
+- **`.gitignore`**: added `*-sa-key.json` pattern to cover `stewyrt-sa-key.json` (existing `service-account*.json` pattern did not match this filename).
+
+### Cloud Functions (`functions/src/index.ts`)
+- **`scheduleUpcomingQuestions`** (new): `onSchedule("0 2 * * 0")` — fires every Sunday at 02:00 UTC. Fills the next 14 days of `question_schedule`, one pulse + one horizon question per day. Skips already-locked dates. Logs run summary to `scheduling_log/{ISO-datetime}`.
+- **`scheduleUpcomingQuestionsManual`** (new): `onCall` — on-demand admin trigger for the same `runScheduler()` core. Requires Firebase Auth. Returns `SchedulerSummary` directly.
+- Scheduling logic: day-of-week category rotation (Mon=rebellion, Tue=reflective, Wed=confessional, Thu=provocative, Fri=whimsical, Sun=existential); Saturday alternates retrospective/anticipatory by ISO week parity. Priority: day_affinity match → emotional balance (avoids 3+ consecutive heavy) → fewest `times_used`.
+
+### Firestore
+- **`questions` collection**: 32 approved questions seeded (6 original + 26 new). New composite index on `(tier ASC, status ASC)` deployed.
+- **`question_schedule` collection**: created and populated by scheduler (doc per date, keys: `pulse_question_id`, `horizon_question_id`, `pulse_locked`, `horizon_locked`).
+- **`scheduling_log` collection**: written per scheduler run.
+
+### Deployment
+- `firebase deploy --only firestore:rules,firestore:indexes` — rules + 6 indexes deployed. Note: 2 indexes exist in project but not in `firestore.indexes.json`; left in place (not force-deleted).
+- `cd functions && npm run deploy` — all 5 functions deployed cleanly.
+
+---
+
 ## [2026-05-09] — Cost & security hardening: verification rate limiting, metadata trust removal
 
 ### Cloud Functions (`functions/src/index.ts`)

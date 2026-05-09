@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -59,8 +60,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   // ── Verifying waiting room ─────────────────────────────────────────────────
   static const _phrases = [
-    'Analyzing vocal resonance...',
-    'Calibrating demographic data...',
+    'Listening for signs of life...',
+    'Checking for human presence...',
     'Consulting the Zeitgeist...',
     'Unlocking the door...',
   ];
@@ -75,11 +76,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   late final AnimationController _shakeController;
   late final Animation<double> _shakeAnimation;
 
-  static const _ages = ['16-24', '25-34', '35-44', '45-54', '55-64', '65+'];
+  // Dropdown options — values are passed verbatim to submitSelfReportedDemographics.
+  static const _ages = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Prefer not to say'];
   static const _genders = ['Male', 'Female', 'Non-Binary', 'Prefer not to say'];
   static const _ethnicities = [
     'Asian',
-    'Black',
+    'Black or African',
     'Hispanic/Latino',
     'White',
     'Mixed',
@@ -87,12 +89,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     'Prefer not to say',
   ];
   static const _regions = [
+    'Northern Europe',
+    'Western Europe',
+    'Southern Europe',
+    'Eastern Europe',
     'North America',
-    'South America',
-    'Europe',
-    'Asia',
-    'Africa',
+    'Latin America',
+    'Middle East & North Africa',
+    'Sub-Saharan Africa',
+    'South Asia',
+    'East Asia',
+    'Southeast Asia',
     'Oceania',
+    'Prefer not to say',
   ];
 
   @override
@@ -172,7 +181,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // ── Recording ─────────────────────────────────────────────────────────────
 
   Future<void> _startRecording() async {
-    print('[BOUNCER] _startRecording — checking mic permission');
+    debugPrint('[BOUNCER] _startRecording — checking mic permission');
     final hasPermission = await _recorder.hasPermission();
     if (!hasPermission || !mounted) {
       if (mounted) setState(() => _isRecording = false);
@@ -215,7 +224,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     });
 
     setState(() => _isRecording = true);
-    print('[BOUNCER] Recording started');
+    debugPrint('[BOUNCER] Recording started');
 
     _maxDurationTimer = Timer(const Duration(seconds: 30), () {
       if (_isRecording) _stopAndUpload();
@@ -246,7 +255,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
 
-    print('[BOUNCER] Recording stopped — path: $recordedPath — starting upload');
+    debugPrint('[BOUNCER] Recording stopped — path: $recordedPath — starting upload');
 
     setState(() {
       _isRecording = false;
@@ -262,14 +271,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     final uid = user.uid;
 
     try {
-      await StorageService.uploadOnboardingAudio(
-        recordedPath,
-        uid,
-        claimedAge: _age!,
-        claimedGender: _gender!,
-        claimedEthnicity: _ethnicity!,
-        claimedRegion: _region!,
-      );
+      // Demographic fields are no longer sent as Storage metadata — the Cloud
+      // Function only needs the audio to perform bot-detection, not demographics.
+      await StorageService.uploadOnboardingAudio(recordedPath, uid);
     } catch (e) {
       debugPrint('[STEWYRT][ONBOARDING] Upload failed: $e');
       if (mounted) {
@@ -291,7 +295,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     if (!mounted) return;
 
-    print('[BOUNCER] Upload complete — attaching verification listener for uid: $uid');
+    debugPrint('[BOUNCER] Upload complete — attaching verification listener for uid: $uid');
 
     setState(() {
       _isUploading = false;
@@ -311,6 +315,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _phraseTimer = null;
         _verificationSub = null;
         if (!mounted) return;
+        // Fire-and-forget: store self-reported demographics via Cloud Function.
+        // Navigation to DayOneScreen proceeds regardless of whether this call succeeds.
+        FirebaseFunctions.instance
+            .httpsCallable('submitSelfReportedDemographics')
+            .call({
+              'age':       _age,
+              'gender':    _gender,
+              'ethnicity': _ethnicity,
+              'region':    _region,
+            })
+            .then<void>(
+              (_) {},
+              onError: (e) =>
+                  debugPrint('[STEWYRT][ONBOARDING] Demographics CF error: $e'),
+            );
         SharedPreferences.getInstance().then((prefs) {
           prefs.setBool('hasPassedBouncer', true);
           if (mounted) {
@@ -399,7 +418,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             children: [
               _Headline(),
               const SizedBox(height: 40),
-              _sectionLabel('YOUR DEMOGRAPHICS'),
+              _sectionLabel('ABOUT YOU'),
               const SizedBox(height: 16),
               _StyledDropdown(
                 label: 'Age Range',
@@ -455,8 +474,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ? null
                     : (v) => setState(() => _consentRecording = v),
                 label: const TextSpan(
-                  text: 'I consent to my voice being recorded and processed by AI. '
-                      'I understand the audio file is permanently destroyed immediately after analysis.',
+                  text: 'I consent to a one-time audio recording used solely to '
+                      'confirm I am a real human. The recording is processed and '
+                      'immediately deleted. It is NOT used to identify me or '
+                      'estimate any personal characteristic.',
                 ),
               ),
               const SizedBox(height: 16),
@@ -609,27 +630,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 border: Border.all(color: _border),
                 color: const Color(0xFF0A0A0A),
               ),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Please read aloud:\n',
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 13,
-                        color: _subtle,
-                        height: 1.5,
-                      ),
-                    ),
-                    TextSpan(
-                      text: '"I am a $_gender between the ages of $_age."',
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: _offWhite,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
+              child: Text(
+                'Say a few words — anything at all. '
+                'We just need to hear your voice.',
+                style: GoogleFonts.spaceGrotesk(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: _offWhite,
+                  height: 1.5,
                 ),
               ),
             ),
@@ -651,7 +659,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   const Icon(Icons.mic_none_rounded, color: _offWhite, size: 18),
                   const SizedBox(width: 10),
                   Text(
-                    'Hold to Read Demographics',
+                    'Hold to Verify',
                     style: GoogleFonts.spaceGrotesk(
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
@@ -700,7 +708,7 @@ class _Headline extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Tell us your demographics so your voice counts, tick the boxes, and hold the mic to verify.',
+          'Tell us about yourself, agree to the terms, then hold the button so we know you\'re human.',
           style: GoogleFonts.spaceGrotesk(
             fontSize: 15,
             fontWeight: FontWeight.w400,

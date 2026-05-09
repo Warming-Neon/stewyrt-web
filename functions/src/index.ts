@@ -475,3 +475,342 @@ export const submitSelfReportedDemographics = onCall(async (request) => {
 
   return { success: true };
 });
+
+// ── Question rotation ─────────────────────────────────────────────────────────
+// Two exports sharing a single runScheduler() core:
+//   scheduleUpcomingQuestions       — fires every Sunday at 02:00 UTC
+//   scheduleUpcomingQuestionsManual — callable for on-demand admin triggers
+//
+// The scheduler fills the next 14 days of question_schedule, skipping any
+// date that is already locked (pulse_locked / horizon_locked = true).
+// Each run is logged to scheduling_log/{ISO-datetime}.
+// No email service is currently configured — the log doc is the review mechanism.
+// TODO: wire tee_em@warmingneon.com when an email provider is added.
+
+interface QuestionDoc {
+  id:               string;
+  text:             string;
+  tier:             "pulse" | "horizon";
+  category:         string;
+  emotional_weight: "light" | "medium" | "heavy";
+  day_affinity:     string | null;
+  times_used:       number;
+  last_used_date:   admin.firestore.Timestamp | null;
+  cooldown_days:    number;
+}
+
+interface SchedulerSummary {
+  run_at:              string;
+  dates_processed:     string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  assignments:         Record<string, any>;
+  warnings:            string[];
+  horizon_updated:     boolean;
+  horizon_question_id: string | null;
+}
+
+const WEEKDAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+
+// Required pulse category per day-of-week. Saturday handled separately (alternates by week parity).
+const DAY_CATEGORY: Record<string, string> = {
+  monday:    "rebellion",
+  tuesday:   "reflective",
+  wednesday: "confessional",
+  thursday:  "provocative",
+  friday:    "whimsical",
+  sunday:    "existential",
+};
+
+function utcDateStr(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function addUTCDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setUTCDate(r.getUTCDate() + n);
+  return r;
+}
+
+// ISO week number (1–53). Week starts Monday.
+function isoWeekNumber(d: Date): number {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const jan1 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t.getTime() - jan1.getTime()) / 86_400_000 + 1) / 7);
+}
+
+// Returns the Monday (UTC midnight) of the week containing d.
+function mondayOf(d: Date): Date {
+  const day = d.getUTCDay(); // 0 = Sunday
+  return addUTCDays(d, day === 0 ? -6 : 1 - day);
+}
+
+function cooldownOk(q: QuestionDoc, nowMs: number): boolean {
+  if (!q.last_used_date) return true;
+  return nowMs - q.last_used_date.toDate().getTime() > q.cooldown_days * 86_400_000;
+}
+
+// Returns the required category/categories for a given day.
+// odd ISO week = retrospective, even = anticipatory (Saturday alternation).
+function requiredCategories(dayName: string, week: number): string[] {
+  if (dayName === "saturday") {
+    return [week % 2 === 1 ? "retrospective" : "anticipatory"];
+  }
+  const cat = DAY_CATEGORY[dayName];
+  return cat ? [cat] : [];
+}
+
+// Sorts candidates in preference order and returns the best pick.
+// Priority: (1) day_affinity match, (2) emotional balance, (3) fewest uses.
+function pickBest(
+  candidates:    QuestionDoc[],
+  dayName:       string,
+  recentWeights: ("light" | "medium" | "heavy")[],
+): QuestionDoc {
+  // Deprioritise heavy questions only when the preceding 2 days were both heavy.
+  const precedingBothHeavy =
+    recentWeights.length >= 2 &&
+    recentWeights[recentWeights.length - 1] === "heavy" &&
+    recentWeights[recentWeights.length - 2] === "heavy";
+
+  return [...candidates].sort((a, b) => {
+    const afA = a.day_affinity === dayName ? 0 : 1;
+    const afB = b.day_affinity === dayName ? 0 : 1;
+    if (afA !== afB) return afA - afB;
+
+    if (precedingBothHeavy) {
+      const hvA = a.emotional_weight === "heavy" ? 1 : 0;
+      const hvB = b.emotional_weight === "heavy" ? 1 : 0;
+      if (hvA !== hvB) return hvA - hvB;
+    }
+
+    return a.times_used - b.times_used;
+  })[0];
+}
+
+async function runScheduler(db: admin.firestore.Firestore): Promise<SchedulerSummary> {
+  const now   = new Date();
+  const nowMs = now.getTime();
+
+  const summary: SchedulerSummary = {
+    run_at:              now.toISOString(),
+    dates_processed:     [],
+    assignments:         {},
+    warnings:            [],
+    horizon_updated:     false,
+    horizon_question_id: null,
+  };
+
+  // ── 1. 14-day scheduling window (tomorrow → day 14) ───────────────────────
+  const dates: string[] = [];
+  for (let i = 1; i <= 14; i++) dates.push(utcDateStr(addUTCDays(now, i)));
+
+  // ── 2. Fetch all approved questions (both tiers) ──────────────────────────
+  const [pulseSnap, horizonSnap] = await Promise.all([
+    db.collection("questions").where("tier", "==", "pulse").where("status", "==", "approved").get(),
+    db.collection("questions").where("tier", "==", "horizon").where("status", "==", "approved").get(),
+  ]);
+
+  const pulseQ: QuestionDoc[]   = pulseSnap.docs.map((d) => ({
+    id: d.id, ...(d.data() as Omit<QuestionDoc, "id">),
+  }));
+  const horizonQ: QuestionDoc[] = horizonSnap.docs.map((d) => ({
+    id: d.id, ...(d.data() as Omit<QuestionDoc, "id">),
+  }));
+
+  // ── 3. Fetch schedule context: 7 days prior + full 14-day window ──────────
+  // Used for: prior emotional context, previous horizon ID, and locked entries.
+  const contextStart = utcDateStr(addUTCDays(now, -7));
+  const windowEnd    = dates[dates.length - 1];
+
+  const schedSnap = await db.collection("question_schedule")
+    .where(admin.firestore.FieldPath.documentId(), ">=", contextStart)
+    .where(admin.firestore.FieldPath.documentId(), "<=", windowEnd)
+    .get();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const existing: Record<string, Record<string, any>> = {};
+  for (const doc of schedSnap.docs) existing[doc.id] = doc.data();
+
+  // ── 4. Seed the assigned-IDs set with already-locked pulse IDs ───────────
+  // Prevents double-booking: a question locked on date A can't be picked for B.
+  const assignedIds = new Set<string>();
+  for (const date of dates) {
+    const e = existing[date];
+    if (e?.pulse_locked && e?.pulse_question_id) assignedIds.add(e.pulse_question_id as string);
+  }
+
+  // ── 5. Prime emotional-weight context from the 2 days before the window ───
+  const recentWeights: ("light" | "medium" | "heavy")[] = [];
+  for (let offset = -2; offset <= -1; offset++) {
+    const pid = existing[utcDateStr(addUTCDays(now, offset))]?.pulse_question_id as string | undefined;
+    if (pid) {
+      const q = pulseQ.find((q) => q.id === pid);
+      if (q) recentWeights.push(q.emotional_weight);
+    }
+  }
+
+  // ── 6. Horizon selection — one per Monday-to-Sunday calendar week ─────────
+  // Group the 14 dates by their Monday.
+  const weekGroups = new Map<string, string[]>();
+  for (const date of dates) {
+    const monday = utcDateStr(mondayOf(new Date(date + "T00:00:00Z")));
+    if (!weekGroups.has(monday)) weekGroups.set(monday, []);
+    weekGroups.get(monday)!.push(date);
+  }
+
+  // Find the most recent horizon set before this scheduling window.
+  let prevHorizonId: string | null = null;
+  for (const d of Object.keys(existing).filter((d) => d < dates[0]).sort().reverse()) {
+    const hid = existing[d]?.horizon_question_id as string | undefined;
+    if (hid) { prevHorizonId = hid; break; }
+  }
+
+  const weekHorizonIds = new Map<string, string | null>();
+
+  for (const [monday, weekDates] of weekGroups) {
+    // If any window-day in this week is horizon-locked, use that ID for all days.
+    let lockedId: string | null = null;
+    for (const date of weekDates) {
+      const e = existing[date];
+      if (e?.horizon_locked && e?.horizon_question_id) {
+        lockedId = e.horizon_question_id as string;
+        break;
+      }
+    }
+    if (lockedId) { weekHorizonIds.set(monday, lockedId); continue; }
+
+    // A prior scheduler run may have already assigned a horizon for this week
+    // (on days that fall within our 7-day context window).
+    let priorId: string | null = null;
+    const weekStart = new Date(monday + "T00:00:00Z");
+    for (let i = 0; i < 7 && !priorId; i++) {
+      const hid = existing[utcDateStr(addUTCDays(weekStart, i))]?.horizon_question_id as string | undefined;
+      if (hid) priorId = hid;
+    }
+    if (priorId) { weekHorizonIds.set(monday, priorId); continue; }
+
+    // Select a new horizon: eligible = cooldown OK and not the immediately prior one.
+    const eligible = [...horizonQ]
+      .filter((q) => cooldownOk(q, nowMs) && q.id !== prevHorizonId)
+      .sort((a, b) =>
+        a.times_used !== b.times_used ? a.times_used - b.times_used : Math.random() - 0.5,
+      );
+
+    if (eligible.length === 0) {
+      const warn = `No eligible horizon question for week of ${monday}`;
+      console.warn(`[SCHEDULER] ${warn}`);
+      summary.warnings.push(warn);
+      weekHorizonIds.set(monday, null);
+      continue;
+    }
+
+    const chosen = eligible[0];
+    weekHorizonIds.set(monday, chosen.id);
+    prevHorizonId              = chosen.id; // used as exclusion for the next week in this same run
+    summary.horizon_updated    = true;
+    summary.horizon_question_id = chosen.id;
+    console.log(`[SCHEDULER] Horizon for week of ${monday}: "${chosen.text.slice(0, 60)}"`);
+  }
+
+  // ── 7. Assign pulse for each date and commit via batch ────────────────────
+  const batch = db.batch();
+
+  for (const date of dates) {
+    const e             = existing[date];
+    const pulseLocked   = e?.pulse_locked   === true;
+    const horizonLocked = e?.horizon_locked === true;
+
+    const d       = new Date(date + "T00:00:00Z");
+    const dayName = WEEKDAY_NAMES[d.getUTCDay()];
+    const week    = isoWeekNumber(d);
+    const monday  = utcDateStr(mondayOf(d));
+
+    let pulseId: string | null = null;
+
+    if (pulseLocked) {
+      pulseId = e.pulse_question_id as string;
+      // Keep emotional-weight context current even for locked days.
+      const q = pulseQ.find((q) => q.id === pulseId);
+      if (q) {
+        recentWeights.push(q.emotional_weight);
+        if (recentWeights.length > 2) recentWeights.shift();
+      }
+    } else {
+      const cats       = requiredCategories(dayName, week);
+      const candidates = pulseQ.filter(
+        (q) => cats.includes(q.category) && cooldownOk(q, nowMs) && !assignedIds.has(q.id),
+      );
+
+      if (candidates.length === 0) {
+        // No valid candidate — leave a gap rather than pick the wrong category.
+        const warn = `No pulse candidate for ${date} (${dayName}, ${cats.join("/")}) — needs_question`;
+        console.warn(`[SCHEDULER] ${warn}`);
+        summary.warnings.push(warn);
+        // pulseId remains null; docData.status will be set to "needs_question" below.
+      } else {
+        const best = pickBest(candidates, dayName, recentWeights);
+        pulseId    = best.id;
+        assignedIds.add(best.id);
+        recentWeights.push(best.emotional_weight);
+        if (recentWeights.length > 2) recentWeights.shift();
+        console.log(`[SCHEDULER] Pulse for ${date} (${dayName}): "${best.text.slice(0, 50)}"`);
+      }
+    }
+
+    const horizonId: string | null = horizonLocked
+      ? (e.horizon_question_id as string)
+      : (weekHorizonIds.get(monday) ?? null);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const docData: Record<string, any> = {
+      pulse_question_id:   pulseId,
+      horizon_question_id: horizonId,
+      pulse_locked:        pulseLocked,
+      horizon_locked:      horizonLocked,
+      updated_at:          admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (!e)                       docData.created_at = admin.firestore.FieldValue.serverTimestamp();
+    if (!pulseId && !pulseLocked) docData.status     = "needs_question";
+
+    batch.set(db.collection("question_schedule").doc(date), docData, { merge: true });
+
+    summary.dates_processed.push(date);
+    summary.assignments[date] = { pulse: pulseId, horizon: horizonId };
+  }
+
+  await batch.commit();
+
+  // ── 8. Write run summary to scheduling_log ────────────────────────────────
+  // No email provider is configured. Review runs at:
+  //   Firestore > scheduling_log > <log-id>
+  // TODO: email summary to tee_em@warmingneon.com once a provider is wired.
+  const logId = now.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  await db.collection("scheduling_log").doc(logId).set({
+    ...summary,
+    completed_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  console.log(
+    `[SCHEDULER] Done — ${summary.dates_processed.length} dates processed, ` +
+    `${summary.warnings.length} warning(s). Review: scheduling_log/${logId}`,
+  );
+
+  return summary;
+}
+
+// Scheduled: every Sunday at 02:00 UTC.
+export const scheduleUpcomingQuestions = onSchedule(
+  { schedule: "0 2 * * 0", timeZone: "UTC" },
+  async () => { await runScheduler(admin.firestore()); },
+);
+
+// Callable: on-demand admin trigger. Requires Firebase Auth.
+// Returns the full SchedulerSummary so you can inspect results immediately.
+export const scheduleUpcomingQuestionsManual = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  return await runScheduler(admin.firestore());
+});

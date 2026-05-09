@@ -137,13 +137,13 @@ class FirestoreService {
       timeoutTimer.cancel();
       sub.cancel();
 
-      if (data['isFlagged'] == true || data['error'] == true) {
+      if (data['verifiedAsHuman'] == false || data['error'] == true) {
         final note = data['verificationNote'] as String? ??
             'Verification failed. Please try again.';
-        debugPrint('[STEWYRT][FIRESTORE] 🚫 Verification flagged: $note');
+        debugPrint('[STEWYRT][FIRESTORE] 🚫 Verification failed: $note');
         onError(note);
       } else {
-        debugPrint('[STEWYRT][FIRESTORE] ✅ Verification passed');
+        debugPrint('[STEWYRT][FIRESTORE] ✅ Verification passed — human confirmed');
         onComplete(data);
       }
     }, onError: (Object err) {

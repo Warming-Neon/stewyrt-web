@@ -82,10 +82,13 @@ class _GlobalThreadScreenState extends State<GlobalThreadScreen> {
     try {
       final snap = await FirebaseFirestore.instance
           .collection('responses')
-          .where(Filter.or(
-            Filter('tone',    isEqualTo: widget.emotionTag),
-            Filter('flavor',  isEqualTo: widget.emotionTag),
-            Filter('essence', isEqualTo: widget.emotionTag),
+          .where(Filter.and(
+            Filter.or(
+              Filter('tone',    isEqualTo: widget.emotionTag),
+              Filter('flavor',  isEqualTo: widget.emotionTag),
+              Filter('essence', isEqualTo: widget.emotionTag),
+            ),
+            Filter('blocked', isNotEqualTo: true),
           ))
           .limit(50)
           .get();

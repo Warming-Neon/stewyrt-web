@@ -91,6 +91,7 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
       _firestoreSub = FirebaseFirestore.instance
           .collection('responses')
           .where('pollId', isEqualTo: providedPollId)
+          .where('blocked', isNotEqualTo: true)
           .orderBy('createdAt', descending: true)
           .limit(300)
           .snapshots()
@@ -111,6 +112,7 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
         _firestoreSub = FirebaseFirestore.instance
             .collection('responses')
             .where('pollId', isEqualTo: pollId)
+            .where('blocked', isNotEqualTo: true)
             .orderBy('createdAt', descending: true)
             .limit(300)
             .snapshots()

@@ -5,12 +5,8 @@ import 'upload_bytes_web.dart' if (dart.library.io) 'upload_bytes_io.dart';
 class StorageService {
   static Future<void> uploadOnboardingAudio(
     String localFilePath,
-    String uuid, {
-    required String claimedAge,
-    required String claimedGender,
-    required String claimedEthnicity,
-    required String claimedRegion,
-  }) async {
+    String uuid,
+  ) async {
     final bytes    = await readPathAsBytes(localFilePath);
     final fileSize = bytes.length;
     debugPrint('[STEWYRT][STORAGE] Starting onboarding upload — uuid: $uuid');
@@ -19,15 +15,7 @@ class StorageService {
     final ref  = FirebaseStorage.instance.ref('audio_uploads/onboarding_$uuid.m4a');
     final task = ref.putData(
       bytes,
-      SettableMetadata(
-        contentType: 'audio/mp4',
-        customMetadata: {
-          'claimedAge':       claimedAge,
-          'claimedGender':    claimedGender,
-          'claimedEthnicity': claimedEthnicity,
-          'claimedRegion':    claimedRegion,
-        },
-      ),
+      SettableMetadata(contentType: 'audio/mp4'),
     );
 
     int lastLoggedPercent = -1;

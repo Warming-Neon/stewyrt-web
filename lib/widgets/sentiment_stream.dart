@@ -136,6 +136,7 @@ class SentimentStream extends StatelessWidget {
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
                 .collection('responses')
+                .where('blocked', isNotEqualTo: true)
                 .orderBy('createdAt', descending: true)
                 .limit(30)
                 .snapshots(),

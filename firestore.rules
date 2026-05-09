@@ -1,0 +1,85 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── polls ──────────────────────────────────────────────────────────────────
+    // Any authenticated user may read polls (both active and archived).
+    // No client may write — poll management is admin-only via Console or CF.
+    match /polls/{pollId} {
+      allow read:  if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── responses ──────────────────────────────────────────────────────────────
+    // Authenticated users may read responses that are NOT blocked.
+    // No client may write — all response docs are written by the analyzeAudio CF.
+    //
+    // IMPORTANT: For collection queries (list operations) to succeed, the client
+    // query MUST include .where('blocked', isNotEqualTo: true) or equivalent.
+    // Firestore rejects queries that could return documents the rule would deny.
+    // This requires the Cloud Function to set `blocked: false` on approved
+    // responses — done in Phase 1. Run the Phase 5 backfill before deploying
+    // these rules so existing approved docs are not excluded.
+    match /responses/{responseId} {
+      allow get:   if request.auth != null
+                      && (resource.data.blocked == null || resource.data.blocked == false);
+      allow list:  if request.auth != null
+                      && (resource.data.blocked == null || resource.data.blocked == false);
+      allow write: if false;
+    }
+
+    // ── users ──────────────────────────────────────────────────────────────────
+    // Each user may only read their own verification document.
+    // No client may write — user docs are written by the analyzeAudio CF
+    // (verification path) and submitSelfReportedDemographics CF, both using
+    // the Admin SDK.
+    match /users/{uid} {
+      allow read:  if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    // ── system_logs ────────────────────────────────────────────────────────────
+    // Written exclusively by the purgeOldSentimentAudio Cloud Function (Admin SDK).
+    // No client access permitted.
+    match /system_logs/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── questions ─────────────────────────────────────────────────────────────
+    // Readable by any authenticated user; written only via Admin SDK (seed
+    // script, Cloud Functions). Client writes are blocked.
+    match /questions/{questionId} {
+      allow read:  if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── question_schedule ─────────────────────────────────────────────────────
+    // Stores the daily pulse_question_id / horizon_question_id assignments.
+    // Documents use YYYY-MM-DD as their ID.
+    match /question_schedule/{date} {
+      allow read:  if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── question_history ──────────────────────────────────────────────────────
+    // Append-only audit log written by the scheduling Cloud Function.
+    match /question_history/{historyId} {
+      allow read:  if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── scheduling_log ────────────────────────────────────────────────────────
+    // Written by scheduleUpcomingQuestions Cloud Function (Admin SDK).
+    // Internal audit log — no client access permitted.
+    match /scheduling_log/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── catch-all ──────────────────────────────────────────────────────────────
+    // Any collection not explicitly named above is denied by default.
+    // This covers future collections until rules are explicitly added.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

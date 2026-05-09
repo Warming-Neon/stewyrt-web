@@ -39,24 +39,34 @@
         <p>We are registered with the Information Commissioner's Office (ICO) as a data controller under UK GDPR.</p>
     </div>
 
-    <h2>2. The Audio Lifecycle — Special Category Data</h2>
+    <h2>2. The Audio Lifecycle</h2>
     <div class="highlight-box">
-        <p class="ethical-clause">⚠️ YOUR VOICE IS BIOMETRIC DATA</p>
-        <p>The vocal resonance analysis we perform constitutes processing of <strong>biometric data</strong> under Article 9 of UK GDPR — a special category that attracts the highest level of legal protection. We process this data solely to verify the demographic group you self-declare. We could not achieve equivalent demographic verification without it.</p>
-        <p>This processing occurs <strong>only with your explicit, separately given consent</strong> — via the dedicated consent step in the verification flow. You may withdraw that consent at any time by contacting privacy@stewyrt.com.</p>
+        <p class="ethical-clause">⚠️ TWO TYPES OF AUDIO — TWO DIFFERENT LIFECYCLES</p>
+        <p>Stewyrt records your voice in two distinct contexts, each with its own purpose and retention period.</p>
     </div>
+    <p><strong>2a. Verification Audio (Onboarding)</strong></p>
     <ul>
-        <li><strong>Lawful basis:</strong> Explicit consent (Article 9(2)(a) UK GDPR) for biometric voice analysis; consent (Article 6(1)(a)) for all other processing.</li>
-        <li><strong>Permanent Deletion:</strong> Your raw audio file is NEVER stored long-term. It is processed in volatile memory and purged immediately after the AI analysis is complete.</li>
-        <li>We retain only the anonymised demographic data points (age group, gender group, and sentiment classification) required to facilitate the Stewyrt experience.</li>
+        <li><strong>Purpose:</strong> To confirm you are a real human and not an automated bot. We check for the presence of continuous human speech. This recording is <strong>not</strong> used to identify you, estimate your age, gender, ethnicity, or any other personal characteristic.</li>
+        <li><strong>Lawful basis:</strong> Consent (Article 6(1)(a) UK GDPR) — provided via the dedicated consent step in the verification flow.</li>
+        <li><strong>Retention:</strong> <strong>Deleted immediately</strong> upon completion of AI processing. The file is never written to Firebase Storage — processing occurs in volatile Cloud Function memory only.</li>
+        <li><strong>Your demographics</strong> (age, gender, ethnicity, region) are self-reported by you during onboarding and stored separately in your account record. They are never inferred from your voice.</li>
+    </ul>
+    <p><strong>2b. Sentiment Audio (Pulse Submissions)</strong></p>
+    <ul>
+        <li><strong>Purpose:</strong> To generate a sentiment analysis (tone, flavour, essence) attached to a poll question.</li>
+        <li><strong>Lawful basis:</strong> Consent (Article 6(1)(a) UK GDPR).</li>
+        <li><strong>Retention:</strong> Stored in Firebase Storage (Google Cloud) for <strong>up to 120 days</strong> from the date of submission to allow content moderation review. An automated daily process permanently deletes files at the end of this window. Under <strong>GDPR Article 17</strong> you may request early deletion by contacting <strong>privacy@stewyrt.com</strong> with the approximate date and time of your submission.</li>
+        <li>The derived sentiment classification (tone, flavour, essence) is retained after the audio is deleted, in truly anonymised form that cannot be linked back to you.</li>
     </ul>
 
     <h2>3. What We Retain and For How Long</h2>
     <div class="legal-box">
         <p>Different data has different lifespans on Stewyrt:</p>
         <ul>
-            <li><strong>Raw audio recordings:</strong> Deleted immediately upon completion of AI processing — never stored.</li>
-            <li><strong>Derived sentiment data</strong> (tone, flavour, demographic group): Retained indefinitely in truly anonymised, aggregated form. Because this data cannot be linked back to any individual by any means, it falls outside the scope of UK GDPR as anonymised information — not pseudonymised.</li>
+            <li><strong>Verification audio:</strong> Deleted immediately upon completion of AI processing — never written to Firebase Storage.</li>
+            <li><strong>Sentiment audio (pulse submissions):</strong> Stored for up to <strong>120 days</strong> from submission, then automatically and permanently deleted.</li>
+            <li><strong>Derived sentiment data</strong> (tone, flavour, essence): Retained indefinitely in truly anonymised, aggregated form. Because this data cannot be linked back to any individual by any means, it falls outside the scope of UK GDPR as anonymised information — not pseudonymised.</li>
+            <li><strong>Self-reported demographics</strong> (age, gender, ethnicity, region): Retained in your account record for as long as you hold an account. You may request deletion at any time.</li>
             <li><strong>Session authentication data</strong> (local storage / essential cookie): Retained for the duration of your active session, or until you clear your browser storage.</li>
             <li><strong>Content moderation flags:</strong> Retained for 90 days for platform integrity purposes, then deleted.</li>
         </ul>
@@ -75,9 +85,13 @@
 
     <h2>5. Automated Decision-Making</h2>
     <div class="highlight-box">
-        <p class="ethical-clause">⚠️ AI CLASSIFIES YOUR DEMOGRAPHIC GROUP</p>
-        <p>In accordance with <strong>Article 22 of UK GDPR</strong>, we disclose that Stewyrt uses automated processing — specifically <strong>Gemini AI</strong> — to classify your voice recording and place you into demographic groups (age range, gender group). This classification determines which segment of the Zeitgeist your submission contributes to.</p>
-        <p>This is automated decision-making. It is carried out with your explicit consent, and the output is a statistical interpretation — not an objective fact. The AI can and does make mistakes. You have the right to contest a classification by contacting us at hello@warmingneon.com, though note that by the time you do, the raw audio enabling re-analysis will have already been deleted.</p>
+        <p class="ethical-clause">⚠️ AI PROCESSES YOUR VOICE AND CLASSIFIES YOUR SENTIMENT</p>
+        <p>In accordance with <strong>Article 22 of UK GDPR</strong>, we disclose that Stewyrt uses automated processing — specifically <strong>Gemini AI</strong> — in two ways:</p>
+        <ul>
+            <li><strong>Human verification:</strong> During onboarding, AI analyses your voice to determine whether it contains continuous human speech (bot detection). This is a binary pass/fail check — it does not classify your demographic group or produce any stored output beyond a verification flag on your account.</li>
+            <li><strong>Sentiment classification:</strong> When you submit a pulse response, AI classifies the sentiment of your recording into tone, flavour, and essence categories. This classification determines how your submission contributes to Stewyrt's aggregated view.</li>
+        </ul>
+        <p>Both processes are carried out with your explicit consent, and their outputs are statistical interpretations — not objective facts. The AI can and does make mistakes. You have the right to contest a sentiment classification by contacting us at <strong>privacy@stewyrt.com</strong>, though note that by the time you do, the audio enabling re-analysis may already have been deleted under the 120-day retention policy.</p>
     </div>
 
     <h2>6. Against the Echo Chamber</h2>
@@ -99,9 +113,9 @@
             <li><strong>Restriction:</strong> Request that we pause processing while a dispute is resolved.</li>
             <li><strong>Portability:</strong> Receive your data in a machine-readable format.</li>
             <li><strong>Objection:</strong> Object to processing carried out under legitimate interests.</li>
-            <li><strong>Withdraw consent:</strong> Withdraw biometric processing consent at any time — this will not affect the lawfulness of processing carried out before withdrawal.</li>
+            <li><strong>Withdraw consent:</strong> Withdraw consent to audio processing at any time — this will not affect the lawfulness of processing carried out before withdrawal. Note that withdrawing consent will prevent you from submitting further pulse responses.</li>
         </ul>
-        <p>To exercise any of these rights, contact: <strong>hello@warmingneon.com</strong></p>
+        <p>To exercise any of these rights, contact: <strong>privacy@stewyrt.com</strong></p>
         <p>If you are unsatisfied with our response, you have the right to lodge a complaint with the <strong>Information Commissioner's Office (ICO)</strong>:<br>
         Website: <strong>ico.org.uk</strong> &nbsp;|&nbsp; Phone: <strong>0303 123 1113</strong></p>
     </div>

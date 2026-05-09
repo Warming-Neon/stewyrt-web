@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -303,15 +302,11 @@ class _RecordingSheetState extends State<RecordingSheet> {
     final String responseId;
     if (_kProductionMode) {
       // Production: one response per user per poll.
-      // Delete the old document FIRST so the Firestore listener doesn't fire
-      // immediately with stale analysis — that was the beta bug.
+      // No client-side delete needed — the Cloud Function uses tx.set() which
+      // overwrites any existing document atomically, eliminating the stale-result race.
       final uid = FirebaseAuth.instance.currentUser?.uid ?? uuid;
       responseId = '${uid}_${widget.pollId}';
-      await FirebaseFirestore.instance
-          .collection('responses')
-          .doc(responseId)
-          .delete();
-      debugPrint('[STEWYRT][SUBMIT] Production mode — cleared old doc, Response ID: $responseId');
+      debugPrint('[STEWYRT][SUBMIT] Production mode — Response ID: $responseId');
     } else {
       // Beta: fresh UUID every time so one device can submit multiple responses.
       responseId = uuid;

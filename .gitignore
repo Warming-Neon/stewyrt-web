@@ -47,3 +47,20 @@ app.*.map.json
 # Node / Cloud Functions
 node_modules/
 functions/node_modules/
+functions/lib/
+
+# Firebase
+.firebase/
+
+# Secrets / credentials
+.env
+*.env
+functions/.env
+service-account*.json
+*-sa-key.json
+
+# Android keystore
+*.keystore
+
+# iOS Pods
+ios/Pods/
