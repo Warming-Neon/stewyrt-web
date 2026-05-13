@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -69,9 +70,46 @@ class ResponseItem {
 
 // ── Widget ────────────────────────────────────────────────────────────────────
 
-class SentimentStream extends StatelessWidget {
+class SentimentStream extends StatefulWidget {
   final String currentTopic;
-  const SentimentStream({super.key, required this.currentTopic});
+  final String pollId;
+
+  const SentimentStream({
+    super.key,
+    required this.currentTopic,
+    required this.pollId,
+  });
+
+  @override
+  State<SentimentStream> createState() => _SentimentStreamState();
+}
+
+class _SentimentStreamState extends State<SentimentStream> {
+  late Stream<QuerySnapshot<Map<String, dynamic>>> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    _stream = _buildStream();
+  }
+
+  @override
+  void didUpdateWidget(SentimentStream old) {
+    super.didUpdateWidget(old);
+    if (old.pollId != widget.pollId) {
+      setState(() => _stream = _buildStream());
+    }
+  }
+
+  Stream<QuerySnapshot<Map<String, dynamic>>> _buildStream() {
+    return FirebaseFirestore.instance
+        .collection('responses')
+        .where('pollId', isEqualTo: widget.pollId)
+        .where('blocked', isNotEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .limit(30)
+        .snapshots();
+  }
 
   String _timeAgo(DateTime? dt) {
     if (dt == null) return '';
@@ -88,6 +126,15 @@ class SentimentStream extends StatelessWidget {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (_) => _FeedPlayerSheet(items: items, initialIndex: index),
+    );
+  }
+
+  void _showReportSheet(BuildContext context, String responseId) {
+    HapticFeedback.mediumImpact();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ReportSheet(responseId: responseId),
     );
   }
 
@@ -114,7 +161,7 @@ class SentimentStream extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'LIVE · ${currentTopic.toUpperCase()}',
+                'LIVE · ${widget.currentTopic.toUpperCase()}',
                 style: GoogleFonts.spaceGrotesk(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -134,12 +181,7 @@ class SentimentStream extends StatelessWidget {
         // Live feed
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: FirebaseFirestore.instance
-                .collection('responses')
-                .where('blocked', isNotEqualTo: true)
-                .orderBy('createdAt', descending: true)
-                .limit(30)
-                .snapshots(),
+            stream: _stream,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
@@ -160,11 +202,31 @@ class SentimentStream extends StatelessWidget {
 
               if (items.isEmpty) {
                 return Center(
-                  child: Text(
-                    'No responses yet.\nBe the first.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 13, color: sub, height: 1.6,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.mic_none_outlined,
+                          size: 32,
+                          color: sub.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Be the first to share what you really think.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 15, fontWeight: FontWeight.w500, color: fg,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Press and hold to record.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.spaceGrotesk(fontSize: 12, color: sub),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -178,6 +240,7 @@ class SentimentStream extends StatelessWidget {
                   final item = items[i];
                   return GestureDetector(
                     onTap: () => _showPlayer(context, items, i),
+                    onLongPress: () => _showReportSheet(context, item.id),
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -593,6 +656,177 @@ class _Chip extends StatelessWidget {
         ],
       ),
     ),
+    );
+  }
+}
+
+// ── Report sheet ──────────────────────────────────────────────────────────────
+
+class _ReportSheet extends StatefulWidget {
+  final String responseId;
+  const _ReportSheet({required this.responseId});
+
+  @override
+  State<_ReportSheet> createState() => _ReportSheetState();
+}
+
+class _ReportSheetState extends State<_ReportSheet> {
+  bool _showReasons = false;
+  bool _submitting  = false;
+  bool _submitted   = false;
+
+  static const _reasons = [
+    'Harmful or abusive content',
+    'Spam or fake',
+    'Other',
+  ];
+
+  Future<void> _submit(String reason) async {
+    final nav = Navigator.of(context);
+    setState(() => _submitting = true);
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('submitContentReport')
+          .call({'responseId': widget.responseId, 'reason': reason});
+      if (!mounted) return;
+      setState(() { _submitting = false; _submitted = true; });
+      await Future.delayed(const Duration(milliseconds: 900));
+      if (mounted) nav.pop();
+    } catch (e) {
+      debugPrint('[STEWYRT][REPORT] submitContentReport failed: $e');
+      if (mounted) nav.pop();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg     = isDark ? const Color(0xFF111111) : Colors.white;
+    final fg     = isDark ? const Color(0xFFF5F5F5) : Colors.black;
+    final sub    = isDark ? const Color(0xFF666666) : const Color(0xFF999999);
+    final border = isDark ? const Color(0xFF2A2A2A) : const Color(0xFFEEEEEE);
+    final handle = sub.withValues(alpha: 0.4);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 36, height: 4,
+            decoration: BoxDecoration(color: handle, borderRadius: BorderRadius.circular(2)),
+          ),
+          const SizedBox(height: 24),
+
+          if (_submitted) ...[
+            const Icon(Icons.check_circle_outline_rounded,
+                color: Color(0xFF3DDEC0), size: 40),
+            const SizedBox(height: 16),
+            Text(
+              'Report submitted',
+              style: GoogleFonts.spaceGrotesk(
+                  fontSize: 16, fontWeight: FontWeight.w600, color: fg),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Thank you — our team will review this.',
+              style: GoogleFonts.spaceGrotesk(fontSize: 13, color: sub),
+            ),
+            const SizedBox(height: 8),
+          ] else if (_submitting) ...[
+            SizedBox(
+              width: 28, height: 28,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: fg),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Submitting...',
+              style: GoogleFonts.spaceGrotesk(fontSize: 14, color: sub),
+            ),
+            const SizedBox(height: 8),
+          ] else if (!_showReasons) ...[
+            Text(
+              'OPTIONS',
+              style: GoogleFonts.spaceGrotesk(
+                  fontSize: 11, fontWeight: FontWeight.w600,
+                  color: sub, letterSpacing: 1.8),
+            ),
+            const SizedBox(height: 16),
+            _SheetRow(
+              label: 'Report this response',
+              fg: Colors.redAccent, border: border,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                setState(() => _showReasons = true);
+              },
+            ),
+            _SheetRow(
+              label: 'Cancel',
+              fg: fg, border: Colors.transparent,
+              onTap: () => Navigator.of(context).pop(),
+            ),
+          ] else ...[
+            Text(
+              'Why are you reporting this?',
+              style: GoogleFonts.spaceGrotesk(
+                  fontSize: 15, fontWeight: FontWeight.w600, color: fg),
+            ),
+            const SizedBox(height: 20),
+            ..._reasons.map((r) => _SheetRow(
+              label: r,
+              fg: fg, border: border,
+              onTap: () { HapticFeedback.lightImpact(); _submit(r); },
+            )),
+            _SheetRow(
+              label: 'Back',
+              fg: sub, border: Colors.transparent,
+              onTap: () => setState(() => _showReasons = false),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetRow extends StatelessWidget {
+  const _SheetRow({
+    required this.label,
+    required this.fg,
+    required this.border,
+    required this.onTap,
+  });
+
+  final String label;
+  final Color fg;
+  final Color border;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 15),
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: border),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 15, fontWeight: FontWeight.w500, color: fg,
+          ),
+        ),
+      ),
     );
   }
 }

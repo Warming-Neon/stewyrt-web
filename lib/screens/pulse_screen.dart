@@ -1,4 +1,3 @@
-import 'package:appinio_swiper/appinio_swiper.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -15,6 +14,7 @@ class PollData {
   final String category;
   final String topic;
   final String tier;
+  final bool isPlaceholder;
 
   const PollData({
     required this.id,
@@ -22,7 +22,23 @@ class PollData {
     required this.category,
     required this.topic,
     required this.tier,
+    this.isPlaceholder = false,
   });
+
+  factory PollData.placeholder(String tier) => PollData(
+        id:            '',
+        question:      "Today's question is on its way.",
+        category:      _categoryLabel(tier),
+        topic:         tier,
+        tier:          tier,
+        isPlaceholder: true,
+      );
+
+  static String _categoryLabel(String tier) => switch (tier) {
+        'horizon'     => 'Weekly',
+        'ice_breaker' => 'Always On',
+        _             => 'Daily',
+      };
 
   factory PollData.fromFirestore(DocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data()!;
@@ -34,28 +50,6 @@ class PollData {
       tier:     d['tier']     as String? ?? 'pulse',
     );
   }
-}
-
-// ── Stream ────────────────────────────────────────────────────────────────────
-
-Stream<List<PollData>> _pollsStream({String? filterPollId}) {
-  if (filterPollId != null) {
-    return FirebaseFirestore.instance
-        .collection('polls')
-        .doc(filterPollId)
-        .snapshots()
-        .map((doc) => doc.exists ? [PollData.fromFirestore(doc)] : <PollData>[]);
-  }
-  debugPrint('[STEWYRT][PULSE] Attaching polls stream');
-  return FirebaseFirestore.instance
-      .collection('polls')
-      .where('isActive', isEqualTo: true)
-      .orderBy('createdAt', descending: true)
-      .snapshots()
-      .map((snap) {
-        debugPrint('[STEWYRT][PULSE] polls snapshot — ${snap.docs.length} docs');
-        return snap.docs.map(PollData.fromFirestore).toList();
-      });
 }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
@@ -71,17 +65,83 @@ class PulseScreen extends StatefulWidget {
 }
 
 class _PulseScreenState extends State<PulseScreen> {
-  AppinioSwiperController _swiperController = AppinioSwiperController();
-  int _currentIndex = 0;
+  final PageController _pageController = PageController();
+  late final Stream<List<PollData>> _rotationStream;
 
-  // Track the last known poll list so we can reset the swiper when it changes.
-  List<PollData> _lastPolls = [];
+  @override
+  void initState() {
+    super.initState();
+    _rotationStream = widget.pollId != null
+        ? _singlePollStream(widget.pollId!)
+        : _buildRotationStream();
+    _pageController.addListener(_onPageScroll);
+  }
+
+  void _onPageScroll() {
+    if (mounted) setState(() {});
+  }
+
+  int get _activeIndex {
+    if (!_pageController.hasClients) return 0;
+    return _pageController.page?.round() ?? 0;
+  }
 
   @override
   void dispose() {
-    _swiperController.dispose();
+    _pageController.removeListener(_onPageScroll);
+    _pageController.dispose();
     super.dispose();
   }
+
+  // ── Streams ───────────────────────────────────────────────────────────────
+
+  Stream<List<PollData>> _singlePollStream(String pollId) {
+    return FirebaseFirestore.instance
+        .collection('polls')
+        .doc(pollId)
+        .snapshots()
+        .map((doc) => doc.exists ? [PollData.fromFirestore(doc)] : <PollData>[]);
+  }
+
+  Stream<List<PollData>> _buildRotationStream() async* {
+    debugPrint('[STEWYRT][PULSE] Attaching rotation stream');
+
+    // Fetch ice_breaker once — it's a static card that never rotates out.
+    final iceSnap = await FirebaseFirestore.instance
+        .collection('polls')
+        .where('tier', isEqualTo: 'ice_breaker')
+        .limit(1)
+        .get();
+
+    final icePoll = iceSnap.docs.isEmpty
+        ? null
+        : PollData.fromFirestore(iceSnap.docs.first);
+
+    // Live stream: pulse + horizon active polls, newest first per tier.
+    await for (final snap in FirebaseFirestore.instance
+        .collection('polls')
+        .where('tier', whereIn: ['pulse', 'horizon'])
+        .where('isActive', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .snapshots()) {
+      debugPrint('[STEWYRT][PULSE] rotation snapshot — ${snap.docs.length} docs');
+
+      final docs    = snap.docs.map(PollData.fromFirestore).toList();
+      final pulse   = docs.where((p) => p.tier == 'pulse').firstOrNull;
+      final horizon = docs.where((p) => p.tier == 'horizon').firstOrNull;
+
+      // TODO(reflex): When a Reflex question is active, prepend it here.
+      // Shape becomes [reflex, pulse_or_placeholder, horizon_or_placeholder, ice_breaker_or_placeholder].
+      // Reflex has no placeholder — the slot is absent when no Reflex question is active.
+      yield <PollData>[
+        pulse   ?? PollData.placeholder('pulse'),
+        horizon ?? PollData.placeholder('horizon'),
+        icePoll ?? PollData.placeholder('ice_breaker'),
+      ];
+    }
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
 
   void _viewResonance(String pollId) {
     Navigator.of(context).push(
@@ -102,6 +162,8 @@ class _PulseScreenState extends State<PulseScreen> {
       builder: (_) => RecordingSheet(question: question, pollId: pollId),
     );
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -130,69 +192,59 @@ class _PulseScreenState extends State<PulseScreen> {
           ),
           Expanded(
             child: StreamBuilder<List<PollData>>(
-              stream: _pollsStream(filterPollId: widget.pollId),
+              stream: _rotationStream,
               builder: (context, snapshot) {
-                // ── Loading ────────────────────────────────────────────────
+                // ── Loading ─────────────────────────────────────────────
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const _LoadingView();
                 }
 
-                // ── Error ──────────────────────────────────────────────────
+                // ── Error ────────────────────────────────────────────────
                 if (snapshot.hasError) {
-                  debugPrint('[STEWYRT][PULSE] polls stream ERROR: ${snapshot.error}');
+                  debugPrint('[STEWYRT][PULSE] rotation stream ERROR: ${snapshot.error}');
                   return _ErrorView(message: snapshot.error.toString());
                 }
 
                 final polls = snapshot.data ?? [];
 
-                // ── Empty ──────────────────────────────────────────────────
+                // ── Empty (detail mode only — rotation always yields 3 slots) ──
                 if (polls.isEmpty) {
                   return const _EmptyView();
                 }
 
-                // Clamp index and reset swiper controller if the list changed.
-                if (polls.length != _lastPolls.length) {
-                  _lastPolls = polls;
-                  _currentIndex = _currentIndex.clamp(0, polls.length - 1);
-                  _swiperController.dispose();
-                  _swiperController = AppinioSwiperController();
-                }
+                final activeIdx   = _activeIndex.clamp(0, polls.length - 1);
+                final currentPoll = polls[activeIdx];
 
-                final currentPoll = polls[_currentIndex];
-
-                // ── Loaded ─────────────────────────────────────────────────
+                // ── Loaded ───────────────────────────────────────────────
                 return Column(
                   children: [
-                    // Swiper — top 60%
+                    // Page swiper — top 60%
                     Expanded(
                       flex: 60,
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                        child: AppinioSwiper(
-                          key: ValueKey(polls.length),
-                          controller: _swiperController,
-                          cardCount: polls.length,
-                          loop: true,
-                          onSwipeEnd: (previousIndex, targetIndex, activity) {
-                            setState(() {
-                              _currentIndex = targetIndex % polls.length;
-                            });
-                          },
-                          cardBuilder: (context, index) {
-                            final poll = polls[index % polls.length];
-                            return PollCard(
-                              question: poll.question,
-                              category: poll.category,
-                              tier: poll.tier,
-                              onTap: () => _openRecording(poll.question, poll.id),
-                              onViewResonance: () => _viewResonance(poll.id),
+                        child: PageView.builder(
+                          controller: _pageController,
+                          physics: const ClampingScrollPhysics(),
+                          itemCount: polls.length,
+                          itemBuilder: (context, index) {
+                            final poll = polls[index];
+                            final card = PollCard(
+                              question:        poll.question,
+                              category:        poll.category,
+                              tier:            poll.tier,
+                              onTap:           poll.isPlaceholder ? null : () => _openRecording(poll.question, poll.id),
+                              onViewResonance: poll.isPlaceholder ? null : () => _viewResonance(poll.id),
                             );
+                            return poll.isPlaceholder
+                                ? Opacity(opacity: 0.4, child: card)
+                                : card;
                           },
                         ),
                       ),
                     ),
 
-                    // Dot indicator
+                    // Dot indicator — driven by PageController, not a state variable
                     Center(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -200,10 +252,10 @@ class _PulseScreenState extends State<PulseScreen> {
                           return AnimatedContainer(
                             duration: const Duration(milliseconds: 250),
                             margin: const EdgeInsets.symmetric(horizontal: 3),
-                            width:  i == _currentIndex ? 16 : 6,
+                            width:  i == _activeIndex ? 16 : 6,
                             height: 6,
                             decoration: BoxDecoration(
-                              color: i == _currentIndex
+                              color: i == _activeIndex
                                   ? Theme.of(context).colorScheme.primary
                                   : subColor,
                               borderRadius: BorderRadius.circular(3),
@@ -217,7 +269,10 @@ class _PulseScreenState extends State<PulseScreen> {
                     // Sentiment stream — bottom 40%
                     Expanded(
                       flex: 40,
-                      child: SentimentStream(currentTopic: currentPoll.topic),
+                      child: SentimentStream(
+                        currentTopic: currentPoll.topic,
+                        pollId:       currentPoll.id,
+                      ),
                     ),
                   ],
                 );

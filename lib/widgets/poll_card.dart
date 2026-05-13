@@ -6,7 +6,7 @@ class PollCard extends StatelessWidget {
   final String question;
   final String category;
   final String tier;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final VoidCallback? onViewResonance;
 
   const PollCard({
@@ -14,14 +14,14 @@ class PollCard extends StatelessWidget {
     required this.question,
     required this.category,
     required this.tier,
-    required this.onTap,
+    this.onTap,
     this.onViewResonance,
   });
 
   String get _label {
     switch (tier) {
       case 'horizon':     return 'HORIZON';
-      case 'icebreaker':  return 'ICE BREAKER';
+      case 'ice_breaker': return 'ICE BREAKER';
       default:            return 'THE PULSE';
     }
   }
@@ -75,22 +75,24 @@ class PollCard extends StatelessWidget {
                   height: 1.3,
                 ),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  border: Border.all(color: border),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  'Press to respond',
-                  style: GoogleFonts.spaceGrotesk(
-                    fontSize: 12,
-                    color: subColor,
-                    fontWeight: FontWeight.w500,
+              if (onTap != null) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: border),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Press to respond',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 12,
+                      color: subColor,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
-              ),
+              ],
               if (onViewResonance != null) ...[
                 const SizedBox(height: 10),
                 GestureDetector(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -14,6 +15,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../services/firestore_service.dart';
 import '../services/storage_service.dart';
 import '../utils/limiter.dart';
+import '../widgets/mic_permission_banner.dart';
+import '../widgets/verification_timeout_widget.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'day_one_screen.dart';
 
 const Color _bg = Colors.black;
@@ -30,11 +34,12 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   // ── Dropdown state ────────────────────────────────────────────────────────
   String? _age;
   String? _gender;
   String? _ethnicity;
+  String? _ethnicityCode;
   String? _region;
 
   // ── Checkbox state ────────────────────────────────────────────────────────
@@ -53,10 +58,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   StreamSubscription<Amplitude>? _ampSub;
   final SoftLimiter _limiter = const SoftLimiter();
 
+  // ── Verification prompt (fetched from Firestore on init) ─────────────────
+  String _verificationPrompt = 'Say a few words — anything at all.';
+
+  // ── Microphone permission state ───────────────────────────────────────────
+  bool _micPermissionDenied = false;
+
   // ── Upload / verification state ───────────────────────────────────────────
   bool _isUploading = false;
   bool _isVerifying = false;
+  bool _verifyTimedOut = false;
+  int _attemptsRemaining = _maxVerificationAttempts;
   StreamSubscription<dynamic>? _verificationSub;
+
+  static const int _maxVerificationAttempts = 5;
+  static const String _prefAttemptCount = 'verificationAttemptCount';
+  static const String _prefWindowStart  = 'verificationWindowStart';
 
   // ── Verifying waiting room ─────────────────────────────────────────────────
   static const _phrases = [
@@ -79,15 +96,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   // Dropdown options — values are passed verbatim to submitSelfReportedDemographics.
   static const _ages = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Prefer not to say'];
   static const _genders = ['Male', 'Female', 'Non-Binary', 'Prefer not to say'];
-  static const _ethnicities = [
-    'Asian',
-    'Black or African',
-    'Hispanic/Latino',
-    'White',
-    'Mixed',
-    'Other',
-    'Prefer not to say',
-  ];
+  // ONS 2021 Census categories. Display strings stored as selfReportedEthnicity;
+  // codes stored as selfReportedEthnicityCode. Custom typed values get 'other_unlisted'.
+  static const Map<String, String> _onsCodeMap = {
+    'English, Welsh, Scottish, Northern Irish or British': 'White_British',
+    'Irish':                                               'White_Irish',
+    'Gypsy or Irish Traveller':                            'White_Gypsy_Irish_Traveller',
+    'Roma':                                                'White_Roma',
+    'Any other White background':                          'White_Other',
+    'White and Black Caribbean':                           'Mixed_White_Black_Caribbean',
+    'White and Black African':                             'Mixed_White_Black_African',
+    'White and Asian':                                     'Mixed_White_Asian',
+    'Any other Mixed or Multiple background':              'Mixed_Other',
+    'Indian':                                              'Asian_Indian',
+    'Pakistani':                                           'Asian_Pakistani',
+    'Bangladeshi':                                         'Asian_Bangladeshi',
+    'Chinese':                                             'Asian_Chinese',
+    'Any other Asian background':                          'Asian_Other',
+    'African':                                             'Black_African',
+    'Caribbean':                                           'Black_Caribbean',
+    'Any other Black, African or Caribbean background':    'Black_Other',
+    'Arab':                                                'Other_Arab',
+    'Any other ethnic group':                              'Other_Other',
+    'Prefer not to say':                                   'prefer_not_to_say',
+  };
   static const _regions = [
     'Northern Europe',
     'Western Europe',
@@ -124,6 +156,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       TweenSequenceItem(tween: Tween(begin: -8.0, end: 8.0), weight: 2),
       TweenSequenceItem(tween: Tween(begin: 8.0, end: 0.0), weight: 1),
     ]).animate(CurvedAnimation(parent: _shakeController, curve: Curves.easeOut));
+
+    WidgetsBinding.instance.addObserver(this);
+    _checkMicPermission();
+    _fetchVerificationPrompt();
   }
 
   @override
@@ -136,7 +172,34 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _phraseTimer?.cancel();
     _verificationSub?.cancel();
     _recorder.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _checkMicPermission() async {
+    if (kIsWeb) return;
+    final status = await Permission.microphone.status;
+    if (!mounted) return;
+    setState(() => _micPermissionDenied = status.isDenied || status.isPermanentlyDenied);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkMicPermission();
+  }
+
+  Future<void> _fetchVerificationPrompt() async {
+    try {
+      final snap = await FirebaseFirestore.instance
+          .collection('verification_prompts')
+          .where('active', isEqualTo: true)
+          .get();
+      if (snap.docs.isEmpty || !mounted) return;
+      final text = snap.docs[Random().nextInt(snap.docs.length)].data()['text'] as String?;
+      if (text != null && text.isNotEmpty) setState(() => _verificationPrompt = text);
+    } catch (e) {
+      debugPrint('[STEWYRT][ONBOARDING] Failed to fetch verification prompt: $e');
+    }
   }
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -157,6 +220,33 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       debugPrint('[STEWYRT][ONBOARDING] Could not launch $url');
     }
+  }
+
+  // ── Attempt tracking (local, SharedPreferences) ───────────────────────────
+  // Server is the source of truth; local count avoids extra Firestore reads.
+
+  Future<void> _incrementAttemptCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final windowStart = prefs.getInt(_prefWindowStart) ?? 0;
+    final count       = prefs.getInt(_prefAttemptCount) ?? 0;
+    final now         = DateTime.now().millisecondsSinceEpoch;
+    const window      = 24 * 60 * 60 * 1000;
+    if (now - windowStart > window) {
+      await prefs.setInt(_prefWindowStart, now);
+      await prefs.setInt(_prefAttemptCount, 1);
+    } else {
+      await prefs.setInt(_prefAttemptCount, count + 1);
+    }
+  }
+
+  Future<int> _computeAttemptsRemaining() async {
+    final prefs = await SharedPreferences.getInstance();
+    final windowStart = prefs.getInt(_prefWindowStart) ?? 0;
+    final count       = prefs.getInt(_prefAttemptCount) ?? 0;
+    final now         = DateTime.now().millisecondsSinceEpoch;
+    const window      = 24 * 60 * 60 * 1000;
+    if (now - windowStart > window) return _maxVerificationAttempts;
+    return (_maxVerificationAttempts - count).clamp(0, _maxVerificationAttempts);
   }
 
   // ── Error feedback ────────────────────────────────────────────────────────
@@ -183,10 +273,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _startRecording() async {
     debugPrint('[BOUNCER] _startRecording — checking mic permission');
     final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission || !mounted) {
-      if (mounted) setState(() => _isRecording = false);
+
+    // Permission was pre-requested in initState so this should return instantly.
+    // If it's false the user denied in Settings after the initial prompt.
+    if (!hasPermission) {
+      _pressActive = false;
+      if (mounted) setState(() { _isRecording = false; _micPermissionDenied = true; });
       return;
     }
+    if (!mounted) { _pressActive = false; return; }
 
     final filePath = kIsWeb
         ? ''
@@ -231,6 +326,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     });
   }
 
+  Future<void> _cancelRecording() async {
+    _maxDurationTimer?.cancel();
+    _maxDurationTimer = null;
+    await _ampSub?.cancel();
+    _ampSub = null;
+    await _recorder.stop();
+    await _recorder.dispose();
+    _recorder = AudioRecorder();
+    if (mounted) {
+      setState(() {
+        _isRecording = false;
+        _liveSamples.clear();
+      });
+    }
+  }
+
   Future<void> _stopAndUpload() async {
     if (!_isRecording) return;
     _maxDurationTimer?.cancel();
@@ -270,6 +381,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
     final uid = user.uid;
 
+    final uploadStartTime = DateTime.now();
     try {
       // Demographic fields are no longer sent as Storage metadata — the Cloud
       // Function only needs the audio to perform bot-detection, not demographics.
@@ -295,6 +407,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     if (!mounted) return;
 
+    await _incrementAttemptCount();
+
+    if (!mounted) return;
+
     debugPrint('[BOUNCER] Upload complete — attaching verification listener for uid: $uid');
 
     setState(() {
@@ -310,6 +426,21 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     _verificationSub = FirestoreService.listenForVerification(
       uid,
+      since: uploadStartTime,
+      timeoutSeconds: 45,
+      onTimeout: () async {
+        _phraseTimer?.cancel();
+        _phraseTimer = null;
+        _verificationSub = null;
+        if (!mounted) return;
+        final remaining = await _computeAttemptsRemaining();
+        if (!mounted) return;
+        setState(() {
+          _isVerifying    = false;
+          _verifyTimedOut = true;
+          _attemptsRemaining = remaining;
+        });
+      },
       (_) {
         _phraseTimer?.cancel();
         _phraseTimer = null;
@@ -320,10 +451,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         FirebaseFunctions.instance
             .httpsCallable('submitSelfReportedDemographics')
             .call({
-              'age':       _age,
-              'gender':    _gender,
-              'ethnicity': _ethnicity,
-              'region':    _region,
+              'age':          _age,
+              'gender':       _gender,
+              'ethnicity':    _ethnicity,
+              'ethnicityCode': _ethnicityCode,
+              'region':       _region,
             })
             .then<void>(
               (_) {},
@@ -365,6 +497,23 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_verifyTimedOut) {
+      return Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: VerificationTimeoutWidget(
+                attemptsRemaining: _attemptsRemaining,
+                onRetry: () => setState(() => _verifyTimedOut = false),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_isVerifying) {
       return Scaffold(
         backgroundColor: _bg,
@@ -438,13 +587,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     : (v) => setState(() => _gender = v),
               ),
               const SizedBox(height: 12),
-              _StyledDropdown(
-                label: 'Ethnicity',
+              _EthnicitySearchField(
                 value: _ethnicity,
-                items: _ethnicities,
-                onChanged: _isRecording || _isUploading
-                    ? null
-                    : (v) => setState(() => _ethnicity = v),
+                enabled: !_isRecording && !_isUploading,
+                onChanged: (v) => setState(() {
+                  _ethnicity = v;
+                  _ethnicityCode = v != null ? (_onsCodeMap[v] ?? 'other_unlisted') : null;
+                }),
               ),
               const SizedBox(height: 12),
               _StyledDropdown(
@@ -492,9 +641,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     TextSpan(
                       text: 'Terms of Service',
                       style: const TextStyle(
-                        color: Color(0xFF00FFCC),
+                        color: Color(0xFF3DDEC0),
                         decoration: TextDecoration.underline,
-                        decorationColor: Color(0xFF00FFCC),
+                        decorationColor: Color(0xFF3DDEC0),
                       ),
                       recognizer: _termsRecognizer,
                     ),
@@ -502,9 +651,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     TextSpan(
                       text: 'Privacy Policy',
                       style: const TextStyle(
-                        color: Color(0xFF00FFCC),
+                        color: Color(0xFF3DDEC0),
                         decoration: TextDecoration.underline,
-                        decorationColor: Color(0xFF00FFCC),
+                        decorationColor: Color(0xFF3DDEC0),
                       ),
                       recognizer: _privacyRecognizer,
                     ),
@@ -539,14 +688,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _startRecording();
       },
       onPointerUp: (_) {
-        if (!_isRecording) return;
         _pressActive = false;
+        if (!_isRecording) return;
         _stopAndUpload();
       },
       onPointerCancel: (_) {
-        if (!_isRecording) return;
         _pressActive = false;
-        _stopAndUpload();
+        if (!_isRecording) return;
+        // Cancel = gesture stolen by scroll, not a deliberate release — discard.
+        _cancelRecording();
       },
       child: _buildHoldButtonContent(),
     );
@@ -621,6 +771,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (_micPermissionDenied) ...[
+            MicPermissionBanner(
+              message: "Stewyrt needs your microphone to verify you're human. Tap to open Settings.",
+            ),
+            const SizedBox(height: 12),
+          ],
           if (valid) ...[
             Container(
               width: double.infinity,
@@ -631,8 +787,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 color: const Color(0xFF0A0A0A),
               ),
               child: Text(
-                'Say a few words — anything at all. '
-                'We just need to hear your voice.',
+                _verificationPrompt,
                 style: GoogleFonts.spaceGrotesk(
                   fontSize: 15,
                   fontWeight: FontWeight.w500,
@@ -871,4 +1026,194 @@ class _LiveWaveformPainter extends CustomPainter {
   @override
   bool shouldRepaint(_LiveWaveformPainter old) =>
       old.samples.length != samples.length || old.barColor != barColor;
+}
+
+// ── Ethnicity search field ────────────────────────────────────────────────────
+// Replaces the static dropdown with a search-as-you-type field backed by the
+// ONS 2021 Census category list. Custom text is accepted and stored as-is
+// with ethnicityCode = 'other_unlisted'.
+
+class _EthnicitySearchField extends StatefulWidget {
+  const _EthnicitySearchField({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String? value;
+  final bool enabled;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  State<_EthnicitySearchField> createState() => _EthnicitySearchFieldState();
+}
+
+class _EthnicitySearchFieldState extends State<_EthnicitySearchField> {
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  bool _showList = false;
+  List<String> _filtered = _allOptions;
+
+  static const _allOptions = [
+    'English, Welsh, Scottish, Northern Irish or British',
+    'Irish',
+    'Gypsy or Irish Traveller',
+    'Roma',
+    'Any other White background',
+    'White and Black Caribbean',
+    'White and Black African',
+    'White and Asian',
+    'Any other Mixed or Multiple background',
+    'Indian',
+    'Pakistani',
+    'Bangladeshi',
+    'Chinese',
+    'Any other Asian background',
+    'African',
+    'Caribbean',
+    'Any other Black, African or Caribbean background',
+    'Arab',
+    'Any other ethnic group',
+    'Prefer not to say',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.value != null) _controller.text = widget.value!;
+    _focusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (_focusNode.hasFocus) {
+      setState(() {
+        _filtered = _getFiltered(_controller.text);
+        _showList = true;
+      });
+    } else {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted) setState(() => _showList = false);
+      });
+    }
+  }
+
+  List<String> _getFiltered(String query) {
+    if (query.isEmpty) return _allOptions;
+    final q = query.toLowerCase();
+    return _allOptions.where((e) => e.toLowerCase().contains(q)).toList();
+  }
+
+  void _onTextChanged(String text) {
+    setState(() => _filtered = _getFiltered(text));
+    widget.onChanged(text.isEmpty ? null : text);
+  }
+
+  void _select(String value) {
+    _controller.text = value;
+    _focusNode.unfocus();
+    setState(() => _showList = false);
+    widget.onChanged(value);
+  }
+
+  void _clear() {
+    _controller.clear();
+    setState(() {
+      _showList = false;
+      _filtered = _allOptions;
+    });
+    widget.onChanged(null);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_onFocusChange);
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final listVisible = _showList && _filtered.isNotEmpty;
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 200),
+      opacity: widget.enabled ? 1.0 : 0.4,
+      child: Column(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              border: Border(
+                top:    const BorderSide(color: _border),
+                left:   const BorderSide(color: _border),
+                right:  const BorderSide(color: _border),
+                bottom: listVisible ? BorderSide.none : const BorderSide(color: _border),
+              ),
+              color: _dropdownCanvas,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    enabled: widget.enabled,
+                    onChanged: _onTextChanged,
+                    style: GoogleFonts.spaceGrotesk(fontSize: 14, color: _offWhite),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'Search your ethnicity...',
+                      hintStyle: GoogleFonts.spaceGrotesk(fontSize: 14, color: _subtle),
+                    ),
+                  ),
+                ),
+                if (_controller.text.isNotEmpty)
+                  GestureDetector(
+                    onTap: _clear,
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: Icon(Icons.close, color: _subtle, size: 18),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (listVisible)
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: const BoxDecoration(
+                border: Border(
+                  left:   BorderSide(color: _border),
+                  right:  BorderSide(color: _border),
+                  bottom: BorderSide(color: _border),
+                ),
+                color: _dropdownCanvas,
+              ),
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: _filtered.length,
+                itemBuilder: (context, i) => GestureDetector(
+                  onTap: () => _select(_filtered[i]),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: i < _filtered.length - 1
+                            ? const BorderSide(color: _border)
+                            : BorderSide.none,
+                      ),
+                    ),
+                    child: Text(
+                      _filtered[i],
+                      style: GoogleFonts.spaceGrotesk(fontSize: 14, color: _offWhite),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }

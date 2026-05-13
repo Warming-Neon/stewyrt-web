@@ -167,9 +167,27 @@ class _ArchiveScreenState extends State<ArchiveScreen> {
                   )
                 : filtered.isEmpty
                     ? Center(
-                        child: Text(
-                          'No questions here yet.',
-                          style: GoogleFonts.spaceGrotesk(fontSize: 13, color: sub),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.search_off_outlined,
+                              size: 32,
+                              color: sub.withValues(alpha: 0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Nothing here yet.',
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 15, fontWeight: FontWeight.w500, color: fg,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Try a different filter.',
+                              style: GoogleFonts.spaceGrotesk(fontSize: 12, color: sub),
+                            ),
+                          ],
                         ),
                       )
                     : GridView.builder(

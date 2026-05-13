@@ -5,6 +5,76 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-13] — Kitchen-Cuppa: deferred items (Phases 4–8)
+
+### Phase 4 — Microphone permission denied recovery
+- **`pubspec.yaml`**: added `permission_handler: ^11.0.0` and `package_info_plus: ^4.0.0`.
+- **`lib/widgets/mic_permission_banner.dart`** (new): amber banner with `mic_off_outlined` icon. Taps open system app settings via `openAppSettings()` (guarded by `kIsWeb`).
+- **`lib/screens/onboarding_screen.dart`**: added `WidgetsBindingObserver` mixin; `_checkMicPermission()` on init and on `AppLifecycleState.resumed`; `_micPermissionDenied` replaces the old SnackBar path; banner injected above hold-button when denied.
+- **`lib/screens/day_one_screen.dart`**: same observer + `_micPermissionDenied` pattern; banner shown above `Listener` in `_buildIdle()`.
+- **`lib/widgets/recording_sheet.dart`**: same observer + banner pattern.
+
+### Phase 5 — Verification prompts from Firestore
+- **`scripts/seed_verification_prompts.js`** (new): seeds 18 prompts (doc IDs `prompt_01`–`prompt_18`) to `verification_prompts` collection; idempotent `batch.set`.
+- **`lib/screens/onboarding_screen.dart`**: `_fetchVerificationPrompt()` fetches `verification_prompts` where `active==true` on init, picks a random doc, updates `_verificationPrompt` state (hardcoded fallback if fetch fails).
+- **`firestore.rules`**: added `verification_prompts/{promptId}` — authenticated read, no write.
+
+### Phase 6 — Waiting-phrase library from Firestore
+- **`scripts/seed_waiting_phrases.js`** (new): 42 phrases across four acts (setup × 12, observation × 10, empathy × 10, technical × 10) written to `waiting_phrases` collection; deterministic IDs, batched.
+- **`lib/services/phrase_service.dart`** (new): singleton `PhraseService.instance`. `prefetch()` is idempotent (guarded by `_fetchStarted`); loads phrases from Firestore grouped by `act`, falls back to hardcoded arrays. `generateStory()` picks one random phrase per act.
+- **`lib/screens/day_one_screen.dart`** + **`lib/widgets/recording_sheet.dart`**: removed four `static const _act*` phrase arrays; `_generateNewStory()` delegates to `PhraseService.instance.generateStory()`; `initState` calls `PhraseService.instance.prefetch()`.
+- **`firestore.rules`**: added `waiting_phrases/{phraseId}` — authenticated read, no write.
+
+### Phase 7 — Settings screen, FAQ, delete-my-data
+- **`lib/screens/settings_screen.dart`** (new): 5 sections (Appearance, Legal, Support, About, Account). Settings icon opens via `Navigator.push` from nav bar. Dark-mode toggle uses existing `ThemeNotifier`. "Delete My Data" shows confirmation dialog then calls `deleteUserData` callable, clears `SharedPreferences`, signs out, and pushes `OnboardingScreen`. Captures `Navigator.of(context)` and `ScaffoldMessenger.of(context)` before first `await` to avoid BuildContext-across-async-gap lint.
+- **`lib/screens/faq_screen.dart`** (new): 7 Q&A items in theme-aware `ListView.separated` with `Divider`.
+- **`functions/src/index.ts`**: added `deleteUserData` callable. Deletes: (1) `responses` where `uid==caller`, (2) `users/{uid}`, (3) `audio_uploads/onboarding_{uid}.m4a` (defensive — normally already gone). Sentiment audio not enumerable by uid; 120-day purge handles it.
+- **`lib/main.dart`**: added `Positioned` settings icon (left side of nav bar); taps push `SettingsScreen`.
+- **`firestore.rules`**: added comment to `users/{uid}` block noting `deleteUserData` uses Admin SDK.
+
+### Phase 8 — Report content button
+- **`lib/widgets/sentiment_stream.dart`**: added `onLongPress` to feed item `GestureDetector` calling `_showReportSheet(context, item.id)`; added `_showReportSheet()` method; added `_ReportSheet` stateful widget (two-step flow: initial options list → reason picker, plus submitting / submitted states); added `_SheetRow` helper. `_submit()` captures `nav` before the `await`, auto-pops 900ms after success.
+- **`functions/src/index.ts`**: added `submitContentReport` callable. Validates `responseId` (UUID v4 regex) and `reason` (allowlist: harassment / hate_speech / spam / misinformation / other). Rate-limits to 10 reports per user per rolling hour. Verifies `responses/{responseId}` exists. Writes `{ responseId, reason, reportedBy, reportedAt, reviewed: false }` to `content_reports/{autoId}`.
+- **`firestore.rules`**: added `content_reports/{reportId}` — all access denied from clients (CF uses Admin SDK).
+
+---
+
+## [2026-05-12] — Kitchen-Cuppa: pre-launch QOL pass (Phases 1–6)
+
+### Phase 1 — Cleanup & Splash
+- **`pubspec.yaml`**: removed unused `appinio_swiper` dependency. Added `flutter_native_splash: ^2.4.0` to dev_dependencies.
+- **Deleted orphaned files**: `lib/screens/global_thread_screen.dart`, `lib/widgets/sentiment_expanded_sheet.dart`, `lib/widgets/audio_player_widget.dart`, `lib/models/sentiment_data.dart` — all were unused after previous refactors.
+- **`android/app/src/main/AndroidManifest.xml`**: explicit `INTERNET` permission added.
+- **`flutter_native_splash.yaml`** (new): pure black splash — `color: "#000000"` for both default and Android 12.
+- **`lib/screens/boot_router.dart`**: replaced empty black scaffold with a centered "stewyrt" wordmark in Space Grotesk Bold 32px white, with a 300ms `FadeTransition` on mount.
+- **`lib/widgets/poll_card.dart`**: `onTap` made nullable (required removed); "Press to respond" button gated on `onTap != null`; tier value corrected from `'icebreaker'` → `'ice_breaker'`.
+
+### Phase 2 — PageView rotation + Ice Breaker
+- **`lib/screens/pulse_screen.dart`** (full rewrite): replaced `AppinioSwiper` with a 3-card fixed-slot `PageView` (Pulse → Horizon → Ice Breaker). `_buildRotationStream()` is an `async*` generator — fetches Ice Breaker once then streams Pulse/Horizon live. Null tiers yield `PollData.placeholder(tier)` at 40% opacity, no onTap. `_activeIndex` derived from `_pageController.page?.round()` via a scroll listener, eliminating dot-indicator desync.
+- **`firestore.indexes.json`**: added `polls(tier ASC, isActive ASC, createdAt DESC)` composite index for the rotation stream query.
+- **`scripts/seed_ice_breaker.js`** (new): one-shot seed that creates `polls/ice_breaker_v1`; uses `path.join(__dirname, '../functions/node_modules/firebase-admin')` for CWD-independent resolution. Successfully seeded.
+
+### Phase 3 — Poll-scoped sentiment feed
+- **`lib/widgets/sentiment_stream.dart`**: converted from `StatelessWidget` to `StatefulWidget`. Added `required String pollId` prop. `_buildStream()` adds `.where('pollId', isEqualTo: widget.pollId)` — feed now shows only responses for the currently visible card. `didUpdateWidget` rebuilds the stream only when `pollId` changes, avoiding churn on scroll.
+
+### Phase 4 — Back button on Resonance
+- **`lib/screens/resonance_native_screen.dart`** + **`lib/screens/resonance_web_screen.dart`**: added conditional back button overlay (`Navigator.canPop()` guard) — shows a translucent circle back arrow when the screen is pushed as a route (e.g. from the recording results tap-to-explore flow), hidden when viewed as a tab.
+
+### Phase 5 — Soft-block UI + moderation review
+- **`functions/src/index.ts`**: added `submitModerationReview` callable. Validates the caller is authenticated, checks the `responseId` exists and is blocked, then writes a doc to `moderation_review/{autoId}` with review fields defaulting to `null`.
+- **`firestore.rules`**: added `moderation_review/{reviewId}` match block — clients may `create` (authenticated), never read or update.
+- **`lib/widgets/recording_sheet.dart`** + **`lib/screens/day_one_screen.dart`**: replaced harsh red-block UI with a soft-block: amber `headset_off_outlined` icon, "We couldn't share this one" headline, "Our AI flagged this response…" body, two-button row — "Try again" (outline) + "Request review" (amber filled). "Request review" calls `submitModerationReview` with the captured `_blockedResponseId`.
+
+### Phase 6 — Empty states
+- **`lib/widgets/sentiment_stream.dart`**: upgraded existing plain-text empty state to icon (`mic_none_outlined` 32px at 50% opacity) + "Be the first to share what you really think." (15px w500) + "Press and hold to record." (12px subtext).
+- **`lib/screens/archive_screen.dart`**: upgraded single-line empty state to icon (`search_off_outlined`) + "Nothing here yet." + "Try a different filter."
+- **`lib/screens/resonance_native_screen.dart`** + **`lib/screens/resonance_web_screen.dart`**: added `_hasData` flag set on first non-zero Firestore snapshot; bottom-centre `AnimatedOpacity` overlay shows "No voices yet. Be the first." (14px white 70% opacity) and fades out in 600ms once data arrives.
+
+### Firestore indexes
+- `polls(isActive ASC, createdAt DESC)` and `responses(pollId ASC, createdAt DESC)` auto-created by Firestore; now codified in `firestore.indexes.json`.
+
+---
+
 ## [2026-05-09] — UI polish: nav 'S' logo, card tier labels, teal live dot, debug overlay removed
 
 ### Flutter client

@@ -27,32 +27,31 @@ stewyrt/
 │   ├── firebase_options.dart             — Generated Firebase config
 │   │
 │   ├── screens/
-│   │   ├── pulse_screen.dart             — Tab 1: swipeable polls + live feed (The Pulse)
+│   │   ├── boot_router.dart              — Launch router: "stewyrt" wordmark fade-in, routes to Onboarding / DayOne / RootShell
+│   │   ├── pulse_screen.dart             — Tab 1: 3-card fixed-slot PageView (Pulse → Horizon → Ice Breaker) + live feed
 │   │   ├── resonance_screen.dart         — Tab 2: platform router (loads web or native screen)
 │   │   ├── resonance_web_screen.dart     — Tab 2 web: 3D brain (The Resonance) via HtmlElementView iframe
 │   │   ├── resonance_native_screen.dart  — Tab 2 iOS/Android: 3D brain (The Resonance) via webview_flutter
 │   │   ├── archive_screen.dart           — Tab 3: library of past/closed polls (The Archive)
-│   │   ├── global_thread_screen.dart     — Drill-down: all responses for a specific emotion tag
-│   │   ├── onboarding_screen.dart        — Bot-detection verification + self-reported demographics
-│   │   └── day_one_screen.dart           — Standalone first-question screen
+│   │   ├── onboarding_screen.dart        — Bot-detection verification + self-reported demographics; fetches random verification_prompt
+│   │   ├── day_one_screen.dart           — Standalone first-question screen; soft-block with human-review request; mic-denied banner
+│   │   ├── settings_screen.dart          — Settings: dark mode, legal links, support, delete-my-data flow
+│   │   └── faq_screen.dart               — 7-item FAQ; theme-aware ListView.separated
 │   │
 │   ├── widgets/
-│   │   ├── recording_sheet.dart          — Record / preview / submit bottom sheet
-│   │   ├── sentiment_stream.dart         — Live scrolling response feed + feed player
-│   │   ├── poll_card.dart                — Swipeable poll question card
-│   │   ├── audio_player_widget.dart      — Reusable audio player UI
-│   │   └── sentiment_expanded_sheet.dart — Expanded detail sheet for a response
+│   │   ├── recording_sheet.dart          — Record / preview / submit bottom sheet; soft-block + human-review request; mic-denied banner
+│   │   ├── sentiment_stream.dart         — Live response feed scoped to current pollId; long-press report flow (_ReportSheet)
+│   │   ├── poll_card.dart                — Poll question card (tier label, nullable onTap for placeholder slots)
+│   │   └── mic_permission_banner.dart    — Amber banner shown when mic permission denied; taps openAppSettings()
 │   │
 │   ├── services/
 │   │   ├── firestore_service.dart        — listenForResult() with timeout + moderation check
 │   │   ├── storage_service.dart          — uploadAudioClip(), uploadOnboardingAudio() — uses putData + conditional import for web compat
+│   │   ├── phrase_service.dart           — Singleton; prefetches waiting_phrases from Firestore; generateStory() picks 4 random acts
 │   │   ├── upload_bytes_io.dart          — Native impl: File.readAsBytes()
 │   │   ├── upload_bytes_web.dart         — Web impl: fetch() + arrayBuffer() via dart:js_interop
 │   │   ├── auth_service.dart             — signInAnonymously()
 │   │   └── resonance_controller.dart     — Static coordinator: tab switching + focus callbacks
-│   │
-│   ├── models/
-│   │   └── sentiment_data.dart           — Mock/seed sentiment data
 │   │
 │   ├── theme/
 │   │   ├── app_theme.dart                — Light/dark ThemeData, Space Grotesk text theme
@@ -71,10 +70,13 @@ stewyrt/
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport
 │
 ├── scripts/
 │   ├── seed_questions.js                 — Idempotent seed: populates questions collection; uses ../functions/node_modules/firebase-admin
+│   ├── seed_ice_breaker.js               — One-shot seed: creates polls/ice_breaker_v1 (tier:"ice_breaker", isActive:true)
+│   ├── seed_verification_prompts.js      — Idempotent seed: 18 prompts to verification_prompts (prompt_01–prompt_18)
+│   ├── seed_waiting_phrases.js           — Idempotent seed: 42 waiting phrases (4 acts) to waiting_phrases collection
 │   └── backfill_blocked_field.ts         — One-shot backfill: stamps blocked=false on pre-migration approved responses
 │
 ├── assets/
@@ -82,7 +84,7 @@ stewyrt/
 │
 ├── firestore.rules                        — Firestore security rules (client read-only, CF writes via Admin SDK)
 ├── storage.rules                          — Storage security rules (auth + audio/* + 5MB cap)
-├── firestore.indexes.json                 — Composite indexes for blocked-filter queries
+├── firestore.indexes.json                 — Composite indexes for blocked-filter, poll-rotation, and schedule queries
 ├── pubspec.yaml
 ├── analysis_options.yaml
 └── firebase.json
@@ -102,7 +104,7 @@ stewyrt/
 
 `_screens` uses `const ResonanceScreen()` for both platforms. The routing happens inside `resonance_screen.dart` via a conditional import — **not** via `kIsWeb` in `main.dart`.
 
-Bottom nav: three tabs + right-side theme toggle icon. Theme state via `ThemeNotifier` (Provider).
+Bottom nav: three tabs + left-side settings icon (pushes `SettingsScreen`) + right-side theme toggle icon. Theme state via `ThemeNotifier` (Provider).
 
 Tab 0 ("Stewyrt") uses a Space Grotesk bold 'S' text widget as its icon (via optional `iconWidget` on `_NavItem`). The other two tabs use `IconData`.
 
@@ -133,8 +135,8 @@ class ResonanceScreen extends StatelessWidget {
 ```
 
 - Uses `dart.library.js_interop` (TRUE on web, FALSE on iOS/Android) — **not** `dart.library.io` which is TRUE on both native and web in Dart 3.11.
-- `zeitgeist_web_screen.dart` declares `typedef ZeitgeistPlatformScreen = ZeitgeistWebScreen;`
-- `zeitgeist_native_screen.dart` declares `class ZeitgeistPlatformScreen` directly
+- `resonance_web_screen.dart` declares `typedef ResonancePlatformScreen = ResonanceWebScreen;`
+- `resonance_native_screen.dart` declares `class ResonancePlatformScreen` as a `StatefulWidget` directly
 - The iOS compiler never sees `dart:js_interop` or `dart:ui_web` imports — they stay inside the web file
 
 ---
@@ -192,7 +194,8 @@ Open in any browser at `http://localhost:8080`.
 | `question` | String | Prompt shown to user |
 | `category` | String | UI category label |
 | `topic` | String | Topic string shown in live feed header |
-| `isActive` | Boolean | Only active polls appear in swiper |
+| `tier` | String | `"pulse"` / `"horizon"` / `"ice_breaker"` — determines fixed card slot in Pulse screen |
+| `isActive` | Boolean | Only active polls appear in the Pulse PageView |
 | `createdAt` | Timestamp | For ordering |
 | `total_submissions` | Number | Incremented on each response |
 | `counts.tone.*` | Number | Per-word tone counts |
@@ -272,6 +275,51 @@ Doc ID is ISO datetime with colons/dots replaced by hyphens (e.g. `2026-05-09T02
 
 Doc ID is `YYYY-MM-DD`. Written by `purgeOldSentimentAudio` daily. No client access.
 
+### `moderation_review` collection
+Created when a user disputes a blocked response via the "Request review" CTA. Written by `submitModerationReview` callable (Admin SDK), never directly by clients.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `responseId` | String | ID of the blocked response under review |
+| `audioPath` | String\|null | Storage path copied from the blocked response |
+| `geminiClassification` | String\|null | Value of `blockedReason` from the response doc |
+| `submittedAt` | Timestamp | Server timestamp of the review request |
+| `requestorUid` | String | Firebase Auth UID of the requester |
+| `userMessage` | String | Fixed string: `"User requested review"` |
+| `reviewedAt` | Timestamp\|null | Set when a human reviewer completes the review |
+| `reviewerNotes` | String\|null | Reviewer's notes |
+| `finalDecision` | String\|null | e.g. `"approved"` / `"upheld"` — set by reviewer |
+
+Firestore rules: clients may `create` (authenticated, via callable) but never `read`, `update`, or `delete`.
+
+### `verification_prompts` collection
+One document per prompt. Seeded by `scripts/seed_verification_prompts.js`.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `text` | String | The prompt shown above the hold-button on the onboarding screen |
+| `active` | Boolean | Only `active == true` docs are fetched; allows soft-disabling a prompt |
+
+### `waiting_phrases` collection
+One document per phrase. Seeded by `scripts/seed_waiting_phrases.js`.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `text` | String | The phrase text |
+| `act` | String | `"setup"` / `"observation"` / `"empathy"` / `"technical"` |
+| `active` | Boolean | Only `active == true` docs are fetched |
+
+### `content_reports` collection
+Created by `submitContentReport` callable (Admin SDK). No client read/write access.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `responseId` | String | UUID v4 of the reported response |
+| `reason` | String | One of: `harassment` / `hate_speech` / `spam` / `misinformation` / `other` |
+| `reportedBy` | String | Firebase Auth UID of the reporter |
+| `reportedAt` | Timestamp | Server timestamp |
+| `reviewed` | Boolean | `false` on creation; set by admin tooling |
+
 ### Storage paths
 - `audio_uploads/<uuid>.m4a` — poll responses; retained **up to 120 days** then auto-purged
 - `audio_uploads/onboarding_<uuid>.m4a` — verification clips; deleted immediately after CF processing (never persisted to disk)
@@ -294,16 +342,17 @@ FirebaseFirestore.instance
   .limit(300)
   .snapshots()
 
-// The Pulse (global stream)
+// The Pulse (per-poll stream — SentimentStream scoped to current card's pollId)
 FirebaseFirestore.instance
   .collection('responses')
+  .where('pollId', isEqualTo: currentPollId)
   .where('blocked', isNotEqualTo: true)
   .orderBy('createdAt', descending: true)
   .limit(30)
   .snapshots()
 ```
 
-The Pulse uses limit 30 without a `pollId` filter. The Resonance always uses limit 300 with a `pollId` filter. The Global Thread screen uses `Filter.and(Filter.or(...), Filter('blocked', isNotEqualTo: true))` for compound queries.
+The Pulse uses limit 30 scoped to the current card's `pollId` (set by the `SentimentStream` widget, updated via `didUpdateWidget` when the page changes). The Resonance uses limit 300 with a `pollId` filter. Both always include the `blocked isNotEqualTo: true` guard.
 
 ---
 
@@ -431,6 +480,44 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 
 ---
 
+### `submitModerationReview` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Require authenticated caller (`request.auth`)
+2. Validate `responseId` (non-empty string)
+3. Fetch `responses/{responseId}` — reject with `not-found` if absent, `failed-precondition` if `blocked !== true`
+4. Write to `moderation_review/{autoId}`: `responseId`, `audioPath`, `geminiClassification` (from `blockedReason`), `submittedAt`, `requestorUid: request.auth.uid`, `userMessage: "User requested review"`; review fields (`reviewedAt`, `reviewerNotes`, `finalDecision`) default to `null`
+
+---
+
+### `deleteUserData` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Require authenticated caller (`request.auth`)
+2. Delete `responses` where `uid == caller uid` (batch, production mode only; beta-mode responses have no `uid` field)
+3. Delete `users/{uid}` document
+4. Attempt to delete `audio_uploads/onboarding_{uid}.m4a` (normally already gone; silent on error)
+5. Sentiment audio files use random UUIDs in their path and cannot be enumerated by uid — the 120-day purge schedule handles eventual deletion
+
+---
+
+### `submitContentReport` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Require authenticated caller (`request.auth`)
+2. Validate `responseId` (UUID v4 regex) and `reason` (allowlist: `harassment` / `hate_speech` / `spam` / `misinformation` / `other`)
+3. Rate-limit: count `content_reports` where `reportedBy == uid` and `reportedAt >= now − 1 hour`; reject with `resource-exhausted` if ≥ 10
+4. Verify `responses/{responseId}` exists (reject `not-found` if absent)
+5. Write `{ responseId, reason, reportedBy, reportedAt: serverTimestamp(), reviewed: false }` to `content_reports/{autoId}`
+
+---
+
 ## Recording Sheet State Machine (`recording_sheet.dart`)
 
 ```
@@ -442,9 +529,9 @@ idle → recording → previewing → waiting → results
 - **idle:** press-and-hold button
 - **recording:** live waveform (`_LiveWaveformPainter`, 60 bars, 50ms amplitude polling), 30s hard cutoff, `SoftLimiter` applied to each dBFS sample
 - **previewing:** playback player with `_PlaybackWaveformPainter`, re-record / submit
-- **waiting:** rotating story phrases (4 acts × random lines), `_phraseTimer` at 800ms
+- **waiting:** rotating story phrases from `PhraseService.instance.generateStory()` (4 acts × random lines, fetched from Firestore `waiting_phrases`), `_phraseTimer` at 800ms
 - **results:** staggered `AnimatedOpacity` reveal — tone (0ms), flavor (400ms), essence (800ms), summary (1400ms), Done button (1900ms)
-- **blocked:** moderation rejection with community guidelines text
+- **blocked:** soft-block — amber `headset_off_outlined` icon, "We couldn't share this one" headline, two-button row: "Try again" (outline, resets to idle) + "Request review" (amber filled, calls `submitModerationReview` with `_blockedResponseId`)
 
 **Production toggle:** `_kProductionMode` (currently `false`). When `true`: one response per user per poll. No client-side delete — the Cloud Function uses `tx.set()` which overwrites any existing document atomically, eliminating the stale-result race.
 
@@ -657,17 +744,20 @@ window.addEventListener('message', e => { processBrainData(typeof e.data === 'st
 | `firebase_auth ^5.0.0` | Anonymous auth |
 | `firebase_storage ^12.0.0` | Audio upload |
 | `firebase_core ^3.0.0` | Init |
-| `cloud_functions ^5.0.0` | Callable Cloud Functions (`submitSelfReportedDemographics`) |
+| `cloud_functions ^5.0.0` | Callable Cloud Functions (`submitSelfReportedDemographics`, `submitModerationReview`, `deleteUserData`, `submitContentReport`) |
 | `record ^5.1.2` | Mic recording (AAC-LC, 128kbps, 44.1kHz mono) |
 | `just_audio ^0.9.40` | Playback |
 | `google_fonts ^6.2.1` | Space Grotesk |
-| `appinio_swiper ^2.0.1` | Poll card swiper |
 | `provider ^6.1.2` | ThemeNotifier |
 | `uuid ^4.5.1` | Response/upload IDs |
 | `path_provider ^2.1.4` | Temp directory for recordings |
 | `web ^1.1.1` | Modern Flutter web DOM interop |
 | `webview_flutter ^4.13.1` | Native WebView for The Resonance on iOS/Android |
-| `url_launcher ^6.3.0` | Opens Terms/Privacy links from onboarding checkboxes |
+| `url_launcher ^6.3.0` | Opens Terms/Privacy links from onboarding + Settings screen |
+| `permission_handler ^11.0.0` | `Permission.microphone.status` + `openAppSettings()` (guarded by `kIsWeb`) |
+| `package_info_plus ^4.0.0` | `PackageInfo.fromPlatform()` — version string in Settings screen |
+
+**Dev dependencies:** `flutter_native_splash ^2.4.0` — generates pure-black splash assets for iOS and Android 12.
 
 **Web interop:** Use `package:web` + `dart:js_interop` (not deprecated `dart:html`). `dart:ui_web` for `platformViewRegistry`.
 
@@ -694,7 +784,9 @@ final bg  = isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
 
 **Buttons:** `_OutlineButton` (border, transparent bg) and `_FilledButton` (solid bg). Always `GestureDetector` + `HapticFeedback.lightImpact()`.
 
-**`PollCard` tier labels:** card header reads from `PollData.tier` (Firestore `polls/{id}['tier']`, defaults `'pulse'`). Values: `'horizon'` → **HORIZON**, `'icebreaker'` → **ICE BREAKER**, anything else → **THE PULSE**. Pulse questions are never labelled by category name.
+**`PollCard` tier labels:** card header reads from `PollData.tier` (Firestore `polls/{id}['tier']`, defaults `'pulse'`). Values: `'horizon'` → **HORIZON**, `'ice_breaker'` → **ICE BREAKER**, anything else → **THE PULSE**. Pulse questions are never labelled by category name.
+
+**Pulse screen PageView:** Fixed 3-slot `PageView` — slot 0 = Pulse, slot 1 = Horizon, slot 2 = Ice Breaker. Missing tiers yield `PollData.placeholder(tier)` (40% opacity, `onTap: null`). `_buildRotationStream()` is an `async*` generator — Ice Breaker fetched once before the live loop, Pulse/Horizon streamed via `whereIn`. Active index derived from `_pageController.page?.round()` via a scroll listener, never stored as separate state.
 
 **Chips:** `_TagChip` / `_Chip` — small allcaps label + larger value, rounded 12px container.
 

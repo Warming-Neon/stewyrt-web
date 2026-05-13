@@ -21,8 +21,12 @@ service cloud.firestore {
     // responses — done in Phase 1. Run the Phase 5 backfill before deploying
     // these rules so existing approved docs are not excluded.
     match /responses/{responseId} {
+      // resource is null when the document doesn't exist yet (Cloud Function
+      // hasn't written it). Allow the listener to attach and wait for the write.
       allow get:   if request.auth != null
-                      && (resource.data.blocked == null || resource.data.blocked == false);
+                      && (resource == null
+                          || resource.data.blocked == null
+                          || resource.data.blocked == false);
       allow list:  if request.auth != null
                       && (resource.data.blocked == null || resource.data.blocked == false);
       allow write: if false;
@@ -33,6 +37,7 @@ service cloud.firestore {
     // No client may write — user docs are written by the analyzeAudio CF
     // (verification path) and submitSelfReportedDemographics CF, both using
     // the Admin SDK.
+    // Deletion is handled by the deleteUserData CF (Admin SDK — bypasses rules).
     match /users/{uid} {
       allow read:  if request.auth != null && request.auth.uid == uid;
       allow write: if false;
@@ -72,6 +77,36 @@ service cloud.firestore {
     // Written by scheduleUpcomingQuestions Cloud Function (Admin SDK).
     // Internal audit log — no client access permitted.
     match /scheduling_log/{docId} {
+      allow read, write: if false;
+    }
+
+    // ── waiting_phrases ────────────────────────────────────────────────────────
+    // Readable by any authenticated user; written only via Admin SDK (seed script).
+    match /waiting_phrases/{phraseId} {
+      allow read:  if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── verification_prompts ───────────────────────────────────────────────────
+    // Readable by any authenticated user; written only via Admin SDK (seed script).
+    match /verification_prompts/{promptId} {
+      allow read:  if request.auth != null;
+      allow write: if false;
+    }
+
+    // ── moderation_review ─────────────────────────────────────────────────────
+    // Written server-side by the submitModerationReview Cloud Function.
+    // Clients may create (submit a review request) but never read or modify.
+    match /moderation_review/{reviewId} {
+      allow read:          if false;
+      allow create:        if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // ── content_reports ───────────────────────────────────────────────────────
+    // Written by the submitContentReport Cloud Function (callable, uses Admin SDK).
+    // No direct client read/update/delete access — reviewed by admins only.
+    match /content_reports/{reportId} {
       allow read, write: if false;
     }
 

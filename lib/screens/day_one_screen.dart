@@ -8,9 +8,14 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import '../services/firestore_service.dart';
 import '../services/storage_service.dart';
 import '../utils/limiter.dart';
+import '../services/phrase_service.dart';
+import '../widgets/mic_permission_banner.dart';
+import '../widgets/verification_timeout_widget.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../main.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -20,7 +25,7 @@ const String _dayOneQuestion =
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
-enum _D1State { idle, recording, waiting, results, blocked }
+enum _D1State { idle, recording, waiting, results, blocked, timedOut }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -31,7 +36,8 @@ class DayOneScreen extends StatefulWidget {
   State<DayOneScreen> createState() => _DayOneScreenState();
 }
 
-class _DayOneScreenState extends State<DayOneScreen> {
+class _DayOneScreenState extends State<DayOneScreen>
+    with WidgetsBindingObserver {
   _D1State _state = _D1State.idle;
 
   // ── Intro phrase ──────────────────────────────────────────────────────────
@@ -49,6 +55,9 @@ class _DayOneScreenState extends State<DayOneScreen> {
     'Stewyrt is trying to teach a pigeon how to play chess in the park. Since he\'s currently losing:',
   ];
 
+  // ── Microphone permission state ───────────────────────────────────────────
+  bool _micPermissionDenied = false;
+
   // ── Recorder ──────────────────────────────────────────────────────────────
   AudioRecorder _recorder = AudioRecorder();
   bool _pressActive = false;
@@ -60,22 +69,6 @@ class _DayOneScreenState extends State<DayOneScreen> {
   StreamSubscription<Amplitude>? _ampSub;
 
   // ── Waiting room story ────────────────────────────────────────────────────
-  static const _act1Setup = [
-    'Having a quick chinwag...', 'Putting the kettle on...', 'Pulling up a chair...', 'Shooting the breeze...',
-    'Chewing the fat...', 'Lending a sympathetic ear...', 'Having a proper natter...', 'Catching up on the latest...',
-  ];
-  static const _act2Observe = [
-    'Having a quick neb...', 'Having a proper gander...', 'Peeking at the subtext...', 'Squinting at the syllables...',
-    'Casting an eye over the details...', 'Having a nosey at the context...', 'Taking a magnifying glass to the mood...',
-  ];
-  static const _act3Empathy = [
-    'Reading between the lines...', 'Weighing the heavy words...', 'Translating the exasperation...', 'Distilling the sheer essence...',
-    'Listening to the silences...', 'Unpacking the baggage...', 'Measuring the exhaustion...', 'Feeling the actual vibe...', 'Finding the absolute flavor...',
-  ];
-  static const _act4Tech = [
-    'Scanning diligently...', 'Consulting the emotional thesaurus...', 'Crunching the feelings...', 'Recalibrating the vibe-meter...',
-    'Decoding the delivery...', 'Connecting the emotional dots...', 'Booting up the empathy engine...', 'Bypassing the sarcasm...',
-  ];
 
   List<String> _currentStory = [];
   int _storyIndex = 0;
@@ -83,6 +76,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
 
   // ── Pipeline ──────────────────────────────────────────────────────────────
   StreamSubscription? _firestoreSub;
+  String? _blockedResponseId;
   AnalysisResult? _result;
 
   // ── Staggered results reveal ──────────────────────────────────────────────
@@ -98,6 +92,9 @@ class _DayOneScreenState extends State<DayOneScreen> {
   void initState() {
     super.initState();
     _currentIntro = _intros[Random().nextInt(_intros.length)];
+    PhraseService.instance.prefetch();
+    WidgetsBinding.instance.addObserver(this);
+    _checkMicPermission();
   }
 
   @override
@@ -108,7 +105,20 @@ class _DayOneScreenState extends State<DayOneScreen> {
     _phraseTimer?.cancel();
     _firestoreSub?.cancel();
     _recorder.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _checkMicPermission() async {
+    if (kIsWeb) return;
+    final status = await Permission.microphone.status;
+    if (!mounted) return;
+    setState(() => _micPermissionDenied = status.isDenied || status.isPermanentlyDenied);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkMicPermission();
   }
 
   // ── Recorder helpers ──────────────────────────────────────────────────────
@@ -120,15 +130,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
     _recorder = AudioRecorder();
   }
 
-  List<String> _generateNewStory() {
-    final rng = Random();
-    return [
-      _act1Setup  [rng.nextInt(_act1Setup.length)],
-      _act2Observe[rng.nextInt(_act2Observe.length)],
-      _act3Empathy[rng.nextInt(_act3Empathy.length)],
-      _act4Tech   [rng.nextInt(_act4Tech.length)],
-    ];
-  }
+  List<String> _generateNewStory() => PhraseService.instance.generateStory();
 
   // ── Recording ─────────────────────────────────────────────────────────────
 
@@ -139,8 +141,9 @@ class _DayOneScreenState extends State<DayOneScreen> {
     HapticFeedback.mediumImpact();
 
     final hasPermission = await _recorder.hasPermission();
-    if (!hasPermission || !mounted) {
-      setState(() => _state = _D1State.idle);
+    if (!mounted) return;
+    if (!hasPermission) {
+      setState(() { _state = _D1State.idle; _micPermissionDenied = true; });
       return;
     }
 
@@ -279,26 +282,16 @@ class _DayOneScreenState extends State<DayOneScreen> {
         _firestoreSub = null;
         _phraseTimer?.cancel();
         if (!mounted) return;
-        setState(() => _state = _D1State.blocked);
+        setState(() {
+          _state             = _D1State.blocked;
+          _blockedResponseId = uuid;
+        });
       },
       onTimeout: () {
         sub?.cancel();
         _firestoreSub = null;
         _phraseTimer?.cancel();
-        if (mounted) {
-          setState(() => _state = _D1State.idle);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              backgroundColor: const Color(0xFF1A1A1A),
-              behavior: SnackBarBehavior.floating,
-              shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-              content: Text(
-                'Analysis timed out — please try again.',
-                style: GoogleFonts.spaceGrotesk(fontSize: 13, color: const Color(0xFFF5F5F5)),
-              ),
-            ),
-          );
-        }
+        if (mounted) setState(() => _state = _D1State.timedOut);
       },
     );
     _firestoreSub = sub;
@@ -310,6 +303,41 @@ class _DayOneScreenState extends State<DayOneScreen> {
     Future.delayed(const Duration(milliseconds:  800),    () { if (mounted) setState(() => _showEssence = true); });
     Future.delayed(const Duration(milliseconds: 1400),    () { if (mounted) setState(() => _showSummary = true); });
     Future.delayed(const Duration(milliseconds: 1900),    () { if (mounted) setState(() => _showDone    = true); });
+  }
+
+  Future<void> _requestHumanReview() async {
+    final id = _blockedResponseId;
+    if (id == null) return;
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('submitModerationReview')
+          .call({'responseId': id});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF1A1A1A),
+          behavior: SnackBarBehavior.floating,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          content: Text(
+            'Review request submitted — our team will take a look.',
+            style: GoogleFonts.spaceGrotesk(fontSize: 13, color: const Color(0xFFF5F5F5)),
+          ),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFF1A1A1A),
+          behavior: SnackBarBehavior.floating,
+          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+          content: Text(
+            e.message ?? 'Request failed — please try again.',
+            style: GoogleFonts.spaceGrotesk(fontSize: 13, color: const Color(0xFFF5F5F5)),
+          ),
+        ),
+      );
+    }
   }
 
   String _fmtDuration(Duration d) {
@@ -368,6 +396,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
                     _D1State.waiting   => _buildWaiting(),
                     _D1State.results   => _buildResults(),
                     _D1State.blocked   => _buildBlocked(),
+                    _D1State.timedOut  => _buildTimedOut(),
                   },
                 ),
               ),
@@ -385,6 +414,12 @@ class _DayOneScreenState extends State<DayOneScreen> {
       key: const ValueKey('idle'),
       children: [
         const Spacer(),
+        if (_micPermissionDenied) ...[
+          MicPermissionBanner(
+            message: 'Stewyrt needs your microphone to record. Tap to open Settings.',
+          ),
+          const SizedBox(height: 12),
+        ],
         Listener(
           onPointerDown:  (_) => _onPressDown(),
           onPointerUp:    (_) => _onPressUp(),
@@ -473,6 +508,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
     return Column(
       key: const ValueKey('waiting'),
       mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         AnimatedSwitcher(
           duration: const Duration(milliseconds: 400),
@@ -492,6 +528,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
         const SizedBox(height: 10),
         Text(
           'stewyrt is listening...',
+          textAlign: TextAlign.center,
           style: GoogleFonts.spaceGrotesk(fontSize: 12, color: const Color(0xFFAAAAAA)),
         ),
       ],
@@ -582,6 +619,25 @@ class _DayOneScreenState extends State<DayOneScreen> {
     );
   }
 
+  // ── Timed out ─────────────────────────────────────────────────────────────
+
+  Widget _buildTimedOut() {
+    return Column(
+      key: const ValueKey('timedOut'),
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        VerificationTimeoutWidget(
+          attemptsRemaining: null,
+          onRetry: () => setState(() {
+            _state          = _D1State.idle;
+            _liveSamples.clear();
+            _recordDuration = Duration.zero;
+          }),
+        ),
+      ],
+    );
+  }
+
   // ── Blocked ───────────────────────────────────────────────────────────────
 
   Widget _buildBlocked() {
@@ -589,10 +645,10 @@ class _DayOneScreenState extends State<DayOneScreen> {
       key: const ValueKey('blocked'),
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.block_rounded, color: Color(0xFFFF3B30), size: 44),
+        const Icon(Icons.headset_off_outlined, color: Color(0xFFD4A574), size: 44),
         const SizedBox(height: 20),
         Text(
-          "Your response couldn't be shared.",
+          "We couldn't share this one",
           textAlign: TextAlign.center,
           style: GoogleFonts.spaceGrotesk(
             fontSize: 17,
@@ -603,7 +659,7 @@ class _DayOneScreenState extends State<DayOneScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          'This response contained content that goes against our community guidelines.',
+          "Our AI flagged this response. If you think that's a mistake, you can request a human review.",
           textAlign: TextAlign.center,
           style: GoogleFonts.spaceGrotesk(
             fontSize: 13,
@@ -612,19 +668,60 @@ class _DayOneScreenState extends State<DayOneScreen> {
           ),
         ),
         const SizedBox(height: 32),
-        _D1Button(
-          label: 'Try again',
-          onTap: () async {
-            HapticFeedback.lightImpact();
-            await _resetRecorder();
-            if (mounted) {
-              setState(() {
-                _state          = _D1State.idle;
-                _liveSamples.clear();
-                _recordDuration = Duration.zero;
-              });
-            }
-          },
+        Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  await _resetRecorder();
+                  if (!mounted) return;
+                  setState(() {
+                    _state             = _D1State.idle;
+                    _liveSamples.clear();
+                    _recordDuration    = Duration.zero;
+                    _blockedResponseId = null;
+                  });
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: const Color(0xFFF5F5F5).withValues(alpha: 0.25)),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Try again',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 14, fontWeight: FontWeight.w600,
+                      color: const Color(0xFFF5F5F5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: GestureDetector(
+                onTap: _requestHumanReview,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD4A574),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    'Request review',
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 14, fontWeight: FontWeight.w600,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

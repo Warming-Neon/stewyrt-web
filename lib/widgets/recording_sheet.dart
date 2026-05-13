@@ -9,8 +9,12 @@ import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../screens/resonance_screen.dart';
+import '../services/phrase_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/mic_permission_banner.dart';
 import '../services/firestore_service.dart';
 import '../services/storage_service.dart';
 import '../utils/limiter.dart';
@@ -40,12 +44,16 @@ class RecordingSheet extends StatefulWidget {
   State<RecordingSheet> createState() => _RecordingSheetState();
 }
 
-class _RecordingSheetState extends State<RecordingSheet> {
+class _RecordingSheetState extends State<RecordingSheet>
+    with WidgetsBindingObserver {
   _RecordState _state = _RecordState.idle;
 
   AudioRecorder _recorder = AudioRecorder(); // recreated between sessions
   final _player   = AudioPlayer();
   final _limiter  = const SoftLimiter();
+
+  // Microphone permission
+  bool _micPermissionDenied = false;
 
   // Live waveform
   final List<double> _liveSamples = [];
@@ -68,6 +76,7 @@ class _RecordingSheetState extends State<RecordingSheet> {
   String? _pendingPath;
   Timer? _phraseTimer;
   StreamSubscription? _firestoreSub;
+  String? _blockedResponseId;
   AnalysisResult? _result;
 
   // Staggered reveal flags
@@ -78,35 +87,11 @@ class _RecordingSheetState extends State<RecordingSheet> {
   bool _showDone    = false;
 
   // ── Waiting room story data ────────────────────────────────────────────────
-  static const _act1Setup   = [
-    'Having a quick chinwag...', 'Putting the kettle on...', 'Pulling up a chair...', 'Shooting the breeze...',
-    'Chewing the fat...', 'Lending a sympathetic ear...', 'Having a proper natter...', 'Catching up on the latest...',
-  ];
-  static const _act2Observe = [
-    'Having a quick neb...', 'Having a proper gander...', 'Peeking at the subtext...', 'Squinting at the syllables...',
-    'Casting an eye over the details...', 'Having a nosey at the context...', 'Taking a magnifying glass to the mood...',
-  ];
-  static const _act3Empathy = [
-    'Reading between the lines...', 'Weighing the heavy words...', 'Translating the exasperation...', 'Distilling the sheer essence...',
-    'Listening to the silences...', 'Unpacking the baggage...', 'Measuring the exhaustion...', 'Feeling the actual vibe...', 'Finding the absolute flavor...',
-  ];
-  static const _act4Tech    = [
-    'Scanning diligently...', 'Consulting the emotional thesaurus...', 'Crunching the feelings...', 'Recalibrating the vibe-meter...',
-    'Decoding the delivery...', 'Connecting the emotional dots...', 'Booting up the empathy engine...', 'Bypassing the sarcasm...',
-  ];
 
   List<String> _currentStory = [];
   int _storyIndex = 0;
 
-  List<String> _generateNewStory() {
-    final rng = Random();
-    return [
-      _act1Setup  [rng.nextInt(_act1Setup.length)],
-      _act2Observe[rng.nextInt(_act2Observe.length)],
-      _act3Empathy[rng.nextInt(_act3Empathy.length)],
-      _act4Tech   [rng.nextInt(_act4Tech.length)],
-    ];
-  }
+  List<String> _generateNewStory() => PhraseService.instance.generateStory();
 
   // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -114,6 +99,9 @@ class _RecordingSheetState extends State<RecordingSheet> {
   void initState() {
     super.initState();
     AuthService.signInAnonymously();
+    PhraseService.instance.prefetch();
+    WidgetsBinding.instance.addObserver(this);
+    _checkMicPermission();
   }
 
   @override
@@ -127,7 +115,20 @@ class _RecordingSheetState extends State<RecordingSheet> {
     _firestoreSub?.cancel();
     _recorder.dispose();
     _player.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _checkMicPermission() async {
+    if (kIsWeb) return;
+    final status = await Permission.microphone.status;
+    if (!mounted) return;
+    setState(() => _micPermissionDenied = status.isDenied || status.isPermanentlyDenied);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _checkMicPermission();
   }
 
   // ── Recorder reset ────────────────────────────────────────────────────────
@@ -154,10 +155,18 @@ class _RecordingSheetState extends State<RecordingSheet> {
     HapticFeedback.mediumImpact();
     debugPrint('[STEWYRT][RECORD] Press down — checking mic permission...');
 
+    // Permission was pre-requested in initState so this returns instantly.
+    // If false, user denied in Settings after the initial prompt.
     final hasPermission = await _recorder.hasPermission();
     debugPrint('[STEWYRT][RECORD] Mic permission: $hasPermission');
-    if (!hasPermission || !mounted) {
-      setState(() => _state = _RecordState.idle);
+
+    if (!hasPermission) {
+      _pressActive = false;
+      if (mounted) setState(() { _state = _RecordState.idle; _micPermissionDenied = true; });
+      return;
+    }
+    if (!mounted) {
+      _pressActive = false;
       return;
     }
 
@@ -373,7 +382,8 @@ class _RecordingSheetState extends State<RecordingSheet> {
         _phraseTimer?.cancel();
         if (!mounted) return;
         setState(() {
-          _state         = _RecordState.blocked;
+          _state             = _RecordState.blocked;
+          _blockedResponseId = responseId;
         });
       },
       onTimeout: () {
@@ -425,6 +435,25 @@ class _RecordingSheetState extends State<RecordingSheet> {
     Future.delayed(const Duration(milliseconds: 1900), () {
       if (mounted) setState(() => _showDone = true);
     });
+  }
+
+  Future<void> _requestHumanReview() async {
+    final id = _blockedResponseId;
+    if (id == null) return;
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('submitModerationReview')
+          .call({'responseId': id});
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Review request submitted — our team will take a look')),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message ?? 'Request failed — please try again')),
+      );
+    }
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -513,6 +542,12 @@ class _RecordingSheetState extends State<RecordingSheet> {
     return Column(
       key: const ValueKey('idle'),
       children: [
+        if (_micPermissionDenied) ...[
+          MicPermissionBanner(
+            message: 'Stewyrt needs your microphone to record. Tap to open Settings.',
+          ),
+          const SizedBox(height: 12),
+        ],
         Listener(
           onPointerDown: (_) => _onPressDown(),
           onPointerUp:   (_) => _onPressUp(),
@@ -844,10 +879,10 @@ class _RecordingSheetState extends State<RecordingSheet> {
       mainAxisSize: MainAxisSize.min,
       children: [
         const SizedBox(height: 8),
-        const Icon(Icons.block_rounded, color: Color(0xFFFF3B30), size: 44),
+        const Icon(Icons.headset_off_outlined, color: Color(0xFFD4A574), size: 44),
         const SizedBox(height: 20),
         Text(
-          "Your response couldn't be shared",
+          "We couldn't share this one",
           textAlign: TextAlign.center,
           style: GoogleFonts.spaceGrotesk(
             fontSize: 17, fontWeight: FontWeight.w600, color: fg, height: 1.4,
@@ -855,29 +890,42 @@ class _RecordingSheetState extends State<RecordingSheet> {
         ),
         const SizedBox(height: 12),
         Text(
-          'This response contained content that goes against our community '
-          'guidelines — including threats of violence, hate speech, or content '
-          'that could cause serious harm to others.',
+          "Our AI flagged this response. If you think that's a mistake, you can request a human review.",
           textAlign: TextAlign.center,
           style: GoogleFonts.spaceGrotesk(
             fontSize: 13, color: sub, height: 1.6,
           ),
         ),
         const SizedBox(height: 32),
-        _FilledButton(
-          label: 'Try again',
-          bg: isDark ? const Color(0xFFF5F5F5) : const Color(0xFF000000),
-          fg: isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF),
-          onTap: () async {
-            HapticFeedback.lightImpact();
-            await _resetRecorder();
-            setState(() {
-              _state          = _RecordState.idle;
-              _liveSamples.clear();
-              _recordDuration = Duration.zero;
-              _pendingPath    = null;
-            });
-          },
+        Row(
+          children: [
+            Expanded(
+              child: _OutlineButton(
+                label: 'Try again',
+                fg: fg,
+                onTap: () async {
+                  HapticFeedback.lightImpact();
+                  await _resetRecorder();
+                  setState(() {
+                    _state             = _RecordState.idle;
+                    _liveSamples.clear();
+                    _recordDuration    = Duration.zero;
+                    _pendingPath       = null;
+                    _blockedResponseId = null;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _FilledButton(
+                label: 'Request review',
+                bg: const Color(0xFFD4A574),
+                fg: Colors.black,
+                onTap: _requestHumanReview,
+              ),
+            ),
+          ],
         ),
       ],
     );

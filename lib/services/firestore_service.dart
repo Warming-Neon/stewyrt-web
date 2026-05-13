@@ -115,6 +115,8 @@ class FirestoreService {
     void Function(Map<String, dynamic> data) onComplete,
     void Function(String message) onError, {
     int timeoutSeconds = 120,
+    DateTime? since,
+    void Function()? onTimeout,
   }) {
     debugPrint('[STEWYRT][FIRESTORE] Attaching verification listener on users/$uid');
 
@@ -125,7 +127,11 @@ class FirestoreService {
     final timeoutTimer = Timer(Duration(seconds: timeoutSeconds), () {
       debugPrint('[STEWYRT][FIRESTORE] ⚠️  Verification timeout after ${timeoutSeconds}s');
       sub.cancel();
-      onError('Verification timed out — please try again.');
+      if (onTimeout != null) {
+        onTimeout();
+      } else {
+        onError('Verification timed out — please try again.');
+      }
     });
 
     sub = docRef.snapshots().listen((snap) {
@@ -133,6 +139,12 @@ class FirestoreService {
       if (!snap.exists) return;
       final data = snap.data();
       if (data == null || !data.containsKey('verifiedAt')) return;
+
+      // Ignore results from a previous verification attempt.
+      if (since != null) {
+        final verifiedAt = (data['verifiedAt'] as Timestamp).toDate();
+        if (!verifiedAt.isAfter(since)) return;
+      }
 
       timeoutTimer.cancel();
       sub.cancel();

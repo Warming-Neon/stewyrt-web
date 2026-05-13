@@ -34,6 +34,7 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
   static bool _iframeLoaded = false;
   static bool _focusFired = false;
 
+  bool _hasData = false;
   StreamSubscription? _pollSub;
   StreamSubscription? _firestoreSub;
   String? _currentPollId;
@@ -171,6 +172,8 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
 
     if (totalTags == 0) return;
 
+    if (!_hasData && mounted) setState(() => _hasData = true);
+
     String dominantRegion(String word) {
       final votes = regionVotes[word];
       if (votes == null || votes.isEmpty) return 'Prefrontal';
@@ -277,6 +280,57 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
               ),
             ),
           ),
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: IgnorePointer(
+              child: SafeArea(
+                top: false,
+                child: AnimatedOpacity(
+                  opacity: _hasData ? 0.0 : 1.0,
+                  duration: const Duration(milliseconds: 600),
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 32),
+                    child: Text(
+                      'No voices yet. Be the first.',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          if (Navigator.of(context).canPop())
+            Positioned(
+              top: 0,
+              left: 0,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 16, left: 16),
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.4),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

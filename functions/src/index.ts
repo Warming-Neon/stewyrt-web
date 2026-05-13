@@ -49,7 +49,14 @@ const safetySettings = [
 // Constrained enums for submitSelfReportedDemographics.
 const ALLOWED_AGES: string[]        = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+", "Prefer not to say"];
 const ALLOWED_GENDERS: string[]     = ["Male", "Female", "Non-Binary", "Prefer not to say"];
-const ALLOWED_ETHNICITIES: string[] = ["Asian", "Black or African", "Hispanic/Latino", "White", "Mixed", "Other", "Prefer not to say"];
+const ALLOWED_ETHNICITY_CODES: string[] = [
+  "White_British", "White_Irish", "White_Gypsy_Irish_Traveller", "White_Roma", "White_Other",
+  "Mixed_White_Black_Caribbean", "Mixed_White_Black_African", "Mixed_White_Asian", "Mixed_Other",
+  "Asian_Indian", "Asian_Pakistani", "Asian_Bangladeshi", "Asian_Chinese", "Asian_Other",
+  "Black_African", "Black_Caribbean", "Black_Other",
+  "Other_Arab", "Other_Other",
+  "prefer_not_to_say", "other_unlisted",
+];
 const ALLOWED_REGIONS: string[]     = ["Northern Europe", "Western Europe", "Southern Europe", "Eastern Europe", "North America", "Latin America", "Middle East & North Africa", "Sub-Saharan Africa", "South Asia", "East Asia", "Southeast Asia", "Oceania", "Prefer not to say"];
 
 // ── analyzeAudio ──────────────────────────────────────────────────────────────
@@ -97,7 +104,7 @@ export const analyzeAudio = onObjectFinalized(
         }
       }
 
-      if (attemptCount >= 3) {
+      if (attemptCount >= 5) {
         console.warn(`[STEWYRT] Verification rate limit hit for uid: ${uuid}`);
         if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
         await storageBucket.file(filePath).delete();
@@ -446,17 +453,19 @@ export const submitSelfReportedDemographics = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "Authentication required.");
   }
 
-  const { age, gender, ethnicity, region } = request.data as {
+  const { age, gender, ethnicity, ethnicityCode, region } = request.data as {
     age?: string;
     gender?: string;
     ethnicity?: string;
+    ethnicityCode?: string;
     region?: string;
   };
 
-  if (!age       || !ALLOWED_AGES.includes(age))         throw new HttpsError("invalid-argument", `Invalid age value: ${age}`);
-  if (!gender    || !ALLOWED_GENDERS.includes(gender))   throw new HttpsError("invalid-argument", `Invalid gender value: ${gender}`);
-  if (!ethnicity || !ALLOWED_ETHNICITIES.includes(ethnicity)) throw new HttpsError("invalid-argument", `Invalid ethnicity value: ${ethnicity}`);
-  if (!region    || !ALLOWED_REGIONS.includes(region))   throw new HttpsError("invalid-argument", `Invalid region value: ${region}`);
+  if (!age          || !ALLOWED_AGES.includes(age))                          throw new HttpsError("invalid-argument", `Invalid age value: ${age}`);
+  if (!gender       || !ALLOWED_GENDERS.includes(gender))                    throw new HttpsError("invalid-argument", `Invalid gender value: ${gender}`);
+  if (!ethnicity    || typeof ethnicity !== "string" || !ethnicity.trim())   throw new HttpsError("invalid-argument", "ethnicity is required.");
+  if (!ethnicityCode || !ALLOWED_ETHNICITY_CODES.includes(ethnicityCode))    throw new HttpsError("invalid-argument", `Invalid ethnicityCode value: ${ethnicityCode}`);
+  if (!region       || !ALLOWED_REGIONS.includes(region))                    throw new HttpsError("invalid-argument", `Invalid region value: ${region}`);
 
   const uid = request.auth.uid;
   const db  = admin.firestore();
@@ -464,11 +473,12 @@ export const submitSelfReportedDemographics = onCall(async (request) => {
   // merge: true preserves verifiedAsHuman and other verification fields.
   await db.collection("users").doc(uid).set(
     {
-      selfReportedAge:       age,
-      selfReportedGender:    gender,
-      selfReportedEthnicity: ethnicity,
-      selfReportedRegion:    region,
-      selfReportedAt:        admin.firestore.FieldValue.serverTimestamp(),
+      selfReportedAge:           age,
+      selfReportedGender:        gender,
+      selfReportedEthnicity:     ethnicity,
+      selfReportedEthnicityCode: ethnicityCode,
+      selfReportedRegion:        region,
+      selfReportedAt:            admin.firestore.FieldValue.serverTimestamp(),
     },
     { merge: true },
   );
@@ -813,4 +823,147 @@ export const scheduleUpcomingQuestionsManual = onCall(async (request) => {
     throw new HttpsError("unauthenticated", "Authentication required.");
   }
   return await runScheduler(admin.firestore());
+});
+
+// ── submitModerationReview ────────────────────────────────────────────────────
+// Callable: client submits a human-review request for a blocked response.
+// Validates that the responseId belongs to a real blocked response, then
+// writes a moderation_review doc for human triage.
+export const submitModerationReview = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const { responseId } = request.data as { responseId?: string };
+
+  if (!responseId || typeof responseId !== "string" || responseId.trim().length === 0) {
+    throw new HttpsError("invalid-argument", "responseId is required.");
+  }
+
+  const db = admin.firestore();
+  const responseSnap = await db.collection("responses").doc(responseId).get();
+
+  if (!responseSnap.exists) {
+    throw new HttpsError("not-found", "Response not found.");
+  }
+
+  const data = responseSnap.data()!;
+  if (data["blocked"] !== true) {
+    throw new HttpsError("failed-precondition", "Response is not blocked.");
+  }
+
+  await db.collection("moderation_review").add({
+    responseId,
+    audioPath:            data["audioPath"]     ?? null,
+    geminiClassification: data["blockedReason"] ?? null,
+    submittedAt:          admin.firestore.FieldValue.serverTimestamp(),
+    reviewedAt:           null,
+    reviewerNotes:        null,
+    finalDecision:        null,
+    userMessage:          "User requested review",
+    requestorUid:         request.auth.uid,
+  });
+
+  return { success: true };
+});
+
+// ── deleteUserData ────────────────────────────────────────────────────────────
+// Callable. Permanently deletes all data held for the authenticated caller:
+//   1. Firestore response docs where uid == caller uid (production mode only;
+//      beta-mode responses use random UUIDs and carry no uid field).
+//   2. The users/{uid} document.
+//   3. The onboarding audio file (audio_uploads/onboarding_{uid}.m4a) if still
+//      present — normally deleted immediately post-verification, so this is
+//      defensive cleanup.
+// Sentiment audio clips use random UUIDs in their path and cannot be enumerated
+// by uid; the 120-day purge schedule handles eventual deletion.
+export const deleteUserData = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const uid    = request.auth.uid;
+  const db     = admin.firestore();
+  const bucket = admin.storage().bucket("stewyrt-11.firebasestorage.app");
+
+  // 1. Delete response docs (where uid is stored — production mode).
+  const responsesSnap = await db.collection("responses").where("uid", "==", uid).get();
+  if (!responsesSnap.empty) {
+    const batch = db.batch();
+    for (const doc of responsesSnap.docs) batch.delete(doc.ref);
+    await batch.commit();
+  }
+
+  // 2. Delete the user document.
+  await db.collection("users").doc(uid).delete();
+
+  // 3. Attempt to delete onboarding audio (already gone in most cases).
+  try {
+    await bucket.file(`audio_uploads/onboarding_${uid}.m4a`).delete();
+  } catch (_) {
+    // File not found — expected; ignore.
+  }
+
+  return { success: true };
+});
+
+// ── submitContentReport ───────────────────────────────────────────────────────
+// Callable. Accepts { responseId, reason } from an authenticated user and
+// writes a moderation record to content_reports.
+// Rate limit: max 10 reports per user per rolling hour.
+export const submitContentReport = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const uid = request.auth.uid;
+  const data = request.data as { responseId?: unknown; reason?: unknown };
+
+  // Validate inputs.
+  if (typeof data.responseId !== "string" || !UUID_V4_RE.test(data.responseId)) {
+    throw new HttpsError("invalid-argument", "responseId must be a valid UUID v4.");
+  }
+  const responseId = data.responseId;
+
+  const ALLOWED_REASONS = [
+    "harassment",
+    "hate_speech",
+    "spam",
+    "misinformation",
+    "other",
+  ];
+  if (typeof data.reason !== "string" || !ALLOWED_REASONS.includes(data.reason)) {
+    throw new HttpsError("invalid-argument", "reason must be one of the allowed values.");
+  }
+  const reason = data.reason;
+
+  const db = admin.firestore();
+
+  // Rate limit: max 10 reports per user per rolling hour.
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const recentSnap = await db
+    .collection("content_reports")
+    .where("reportedBy", "==", uid)
+    .where("reportedAt", ">=", oneHourAgo)
+    .get();
+  if (recentSnap.size >= 10) {
+    throw new HttpsError("resource-exhausted", "Report limit reached. Try again later.");
+  }
+
+  // Verify the response doc exists.
+  const responseDoc = await db.collection("responses").doc(responseId).get();
+  if (!responseDoc.exists) {
+    throw new HttpsError("not-found", "Response not found.");
+  }
+
+  // Write the report.
+  await db.collection("content_reports").add({
+    responseId,
+    reason,
+    reportedBy: uid,
+    reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+    reviewed:   false,
+  });
+
+  return { success: true };
 });

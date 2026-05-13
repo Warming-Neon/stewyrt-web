@@ -7,6 +7,7 @@ import 'screens/archive_screen.dart';
 import 'screens/pulse_screen.dart';
 import 'screens/resonance_screen.dart';
 import 'screens/boot_router.dart';
+import 'screens/settings_screen.dart';
 import 'services/resonance_controller.dart';
 import 'theme/app_theme.dart';
 import 'theme/theme_notifier.dart';
@@ -22,6 +23,32 @@ void main() async {
   );
 }
 
+class _TightBouncingPhysics extends BouncingScrollPhysics {
+  const _TightBouncingPhysics({super.parent});
+
+  @override
+  _TightBouncingPhysics applyTo(ScrollPhysics? ancestor) =>
+      _TightBouncingPhysics(parent: buildParent(ancestor));
+
+  @override
+  SpringDescription get spring => const SpringDescription(
+    mass: 0.5,
+    stiffness: 500.0,
+    damping: 24.0,
+  );
+}
+
+class _BouncingScrollBehavior extends ScrollBehavior {
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) =>
+      const _TightBouncingPhysics();
+
+  @override
+  Widget buildOverscrollIndicator(
+          BuildContext context, Widget child, ScrollableDetails details) =>
+      child;
+}
+
 class StewyrtApp extends StatelessWidget {
   const StewyrtApp({super.key});
 
@@ -34,6 +61,7 @@ class StewyrtApp extends StatelessWidget {
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeNotifier.mode,
+      scrollBehavior: _BouncingScrollBehavior(),
       home: const BootRouter(),
     );
   }
@@ -130,6 +158,23 @@ class _RootShellState extends State<RootShell> {
                       onTap: () => setState(() => _selectedIndex = 2),
                     ),
                   ],
+                ),
+                // Settings icon pinned to the left
+                Positioned(
+                  left: 4,
+                  child: GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Icon(
+                        Icons.settings_outlined,
+                        color: subColor,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ),
                 // Theme toggle pinned to the right
                 Positioned(
