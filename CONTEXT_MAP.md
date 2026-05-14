@@ -34,7 +34,7 @@ stewyrt/
 │   │   ├── resonance_native_screen.dart  — Tab 2 iOS/Android: 3D brain (The Resonance) via webview_flutter
 │   │   ├── archive_screen.dart           — Tab 3: library of past/closed polls (The Archive)
 │   │   ├── onboarding_screen.dart        — Bot-detection verification + self-reported demographics; fetches random verification_prompt
-│   │   ├── day_one_screen.dart           — Standalone first-question screen; soft-block with human-review request; mic-denied banner
+│   │   ├── day_one_screen.dart           — Standalone first-question screen; soft-block with human-review request; mic-denied banner; "Maybe later" skip button
 │   │   ├── settings_screen.dart          — Settings: dark mode, legal links, support, delete-my-data flow
 │   │   └── faq_screen.dart               — 7-item FAQ; theme-aware ListView.separated
 │   │
@@ -77,6 +77,7 @@ stewyrt/
 │   ├── seed_ice_breaker.js               — One-shot seed: creates polls/ice_breaker_v1 (tier:"ice_breaker", isActive:true)
 │   ├── seed_verification_prompts.js      — Idempotent seed: 18 prompts to verification_prompts (prompt_01–prompt_18)
 │   ├── seed_waiting_phrases.js           — Idempotent seed: 42 waiting phrases (4 acts) to waiting_phrases collection
+│   ├── fix_ice_breaker_poll_ids.js       — One-shot backfill: sets pollId='ice_breaker_v1' on responses where pollId==""; corrects total_submissions String→int
 │   └── backfill_blocked_field.ts         — One-shot backfill: stamps blocked=false on pre-migration approved responses
 │
 ├── assets/
@@ -104,7 +105,9 @@ stewyrt/
 
 `_screens` uses `const ResonanceScreen()` for both platforms. The routing happens inside `resonance_screen.dart` via a conditional import — **not** via `kIsWeb` in `main.dart`.
 
-Bottom nav: three tabs + left-side settings icon (pushes `SettingsScreen`) + right-side theme toggle icon. Theme state via `ThemeNotifier` (Provider).
+Bottom nav is responsive on viewport width:
+- **≥ 600px:** three tabs + `Positioned` settings icon (left) + `Positioned` theme toggle icon (right) in a `Stack`. No change from original layout.
+- **< 600px:** a slim 40px `AppBar` added to the `Scaffold` with settings icon (leading) and theme toggle (actions); bottom nav shows the three tabs only, centered — no `Stack`, no overlap.
 
 Tab 0 ("Stewyrt") uses a Space Grotesk bold 'S' text widget as its icon (via optional `iconWidget` on `_NavItem`). The other two tabs use `IconData`.
 
@@ -125,12 +128,21 @@ import 'resonance_native_screen.dart'
     if (dart.library.js_interop) 'resonance_web_screen.dart';
 
 class ResonanceScreen extends StatelessWidget {
-  const ResonanceScreen({super.key, this.pollId, this.initialFocusTag});
+  const ResonanceScreen({
+    super.key,
+    this.pollId,
+    this.initialFocusTag,
+    this.showBackButton = false,
+  });
   final String? pollId;
   final String? initialFocusTag;
+  final bool showBackButton;
   @override
-  Widget build(BuildContext context) =>
-      ResonancePlatformScreen(pollId: pollId, initialFocusTag: initialFocusTag);
+  Widget build(BuildContext context) => ResonancePlatformScreen(
+        pollId: pollId,
+        initialFocusTag: initialFocusTag,
+        showBackButton: showBackButton,
+      );
 }
 ```
 
@@ -179,14 +191,14 @@ Open in any browser at `http://localhost:8080`.
 | `question` | String | Poll question text |
 | `pollId` | String | Parent poll document ID |
 | `language` | String | ISO 639-1 code detected by Gemini (e.g. `"en"`, `"es"`, `"fr"`); defaults to `"en"` |
-| `blocked` | Boolean | Always present: `false` for approved, `true` if moderation triggered. **Never absent** — required for Firestore `isNotEqualTo` queries. |
+| `blocked` | Boolean | Always present: `false` for approved, `true` if moderation triggered. **Never absent** — required for Firestore `isEqualTo: false` queries. |
 | `blockedReason` | String | e.g. `"content_policy"` (only on blocked docs) |
 | `uid` | String | Firebase Auth UID (present when derivable from responseId) |
 | `createdAt` | Timestamp | Server timestamp |
 
 **Note:** All three `*Region` fields carry the same value as `anatomicalRegion`. The Flutter aggregator votes across many responses per question to find the dominant region for each recurring emotion word.
 
-**Note:** All client queries on `responses` must include `.where('blocked', isNotEqualTo: true)` — Firestore rejects queries that could return docs the security rule would deny.
+**Note:** All client queries on `responses` must include `.where('blocked', isEqualTo: false)` — Firestore rejects queries that could return docs the security rule would deny. Use `isEqualTo: false` (not `isNotEqualTo: true`) — the range filter has reconciliation lag on real-time listeners causing flash-then-vanish.
 
 ### `polls` collection
 | Field | Type | Notes |
@@ -328,7 +340,7 @@ Created by `submitContentReport` callable (Admin SDK). No client read/write acce
 
 ## Firestore Query Rules (STRICT)
 
-**Every query on `responses` MUST include `.where('blocked', isNotEqualTo: true)`.** Firestore security rules deny reads on blocked docs; Firestore will reject any query that could return a denied document.
+**Every query on `responses` MUST include `.where('blocked', isEqualTo: false)`.** Firestore security rules deny reads on blocked docs; Firestore will reject any query that could return a denied document. Use `isEqualTo: false` — NOT `isNotEqualTo: true`. The range filter has reconciliation lag on real-time listeners after a secondary-index update, causing a flash-then-vanish symptom.
 
 **The Resonance query MUST always be scoped to a specific poll. Never query `responses` globally.**
 
@@ -337,7 +349,7 @@ Created by `submitContentReport` callable (Admin SDK). No client read/write acce
 FirebaseFirestore.instance
   .collection('responses')
   .where('pollId', isEqualTo: currentPollId)
-  .where('blocked', isNotEqualTo: true)
+  .where('blocked', isEqualTo: false)
   .orderBy('createdAt', descending: true)
   .limit(300)
   .snapshots()
@@ -346,13 +358,13 @@ FirebaseFirestore.instance
 FirebaseFirestore.instance
   .collection('responses')
   .where('pollId', isEqualTo: currentPollId)
-  .where('blocked', isNotEqualTo: true)
+  .where('blocked', isEqualTo: false)
   .orderBy('createdAt', descending: true)
   .limit(30)
   .snapshots()
 ```
 
-The Pulse uses limit 30 scoped to the current card's `pollId` (set by the `SentimentStream` widget, updated via `didUpdateWidget` when the page changes). The Resonance uses limit 300 with a `pollId` filter. Both always include the `blocked isNotEqualTo: true` guard.
+The Pulse uses limit 30 scoped to the current card's `pollId` (set by the `SentimentStream` widget, updated via `didUpdateWidget` when the page changes). The Resonance uses limit 300 with a `pollId` filter. Both always include the `blocked isEqualTo: false` guard.
 
 ---
 
@@ -547,7 +559,9 @@ Shown on app launch. Calls `AuthService.signInAnonymously()` then reads `SharedP
 | `hasPassedBouncer = true`, `hasCompletedDayOne = false` | `DayOneScreen` |
 | Both true | `RootShell` |
 
-On web, a compliance `SnackBar` is shown via `addPostFrameCallback` — summarises mindful usage, AI fallibility, and cookie notice. The entire `_init()` is wrapped in try/catch; a connection-error snackbar is shown if Firebase init fails.
+On web, a compliance `SnackBar` is shown via `addPostFrameCallback` when `hasSeenComplianceBanner` is false — summarises mindful usage, AI fallibility, and cookie notice. The entire `_init()` is wrapped in try/catch; a connection-error snackbar is shown if Firebase init fails.
+
+**Post-deletion navigation:** `settings_screen.dart` routes to `BootRouter` (not `OnboardingScreen`) after account deletion, so `_init()` re-runs, evaluates the cleared `hasSeenComplianceBanner`, and shows the compliance banner for that session.
 
 ---
 
@@ -766,8 +780,8 @@ window.addEventListener('message', e => { processBrainData(typeof e.data === 'st
 ## SoftLimiter (`utils/limiter.dart`)
 
 Soft-knee dBFS compressor applied only to waveform display, not the audio file.
-- Threshold: -6 dBFS, Ratio: 8:1, Knee: 4 dB, Noise floor: -60 dBFS
-- `process(rawDb)` → linear 0.0–1.0 bar height
+- `process(rawDb)` — native path. Threshold: -6 dBFS, Ratio: 8:1, Knee: 4 dB, Noise floor: -60 dBFS. Calibrated for `record` package's `MicRecorderDelegate` amplitude range (−10 to −3 dBFS typical speech).
+- `webProcess(db)` — web path. Linear map of `AnalyserNode.getFloatFrequencyData()` frequency-domain range (−60 to −5 dBFS) → 0.0–1.0. Used instead of `process()` on `kIsWeb` because web amplitude values are 30–40 dB lower than native, producing near-zero bar heights with the native compressor.
 - Does NOT modify audio on disk — OS-level AGC handles that
 
 ---
@@ -795,6 +809,7 @@ final bg  = isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
 **Firestore queries:**
 - The Resonance: `responses` scoped to `pollId`, limit 300, `createdAt` descending. **Never query globally.**
 - The Pulse (live feed): `responses`, limit 30, `createdAt` descending.
+- All `responses` queries MUST use `.where('blocked', isEqualTo: false)` — not `isNotEqualTo: true`.
 
 **Audio path resolution priority (ResponseItem):**
 1. `audioPath` field

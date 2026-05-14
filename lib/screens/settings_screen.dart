@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../theme/theme_notifier.dart';
 import 'faq_screen.dart';
-import 'onboarding_screen.dart';
+import 'boot_router.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -99,7 +99,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await FirebaseAuth.instance.signOut();
       if (!mounted) return;
       nav.pushAndRemoveUntil(
-        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+        MaterialPageRoute(builder: (_) => const BootRouter()),
         (_) => false,
       );
     } catch (e) {

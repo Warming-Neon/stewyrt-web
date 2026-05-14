@@ -204,7 +204,9 @@ class _RecordingSheetState extends State<RecordingSheet>
         .listen((amp) {
       if (!mounted) return;
       setState(() {
-        _liveSamples.add(_limiter.process(amp.current));
+        _liveSamples.add(kIsWeb
+            ? SoftLimiter.webProcess(amp.current)
+            : _limiter.process(amp.current));
       });
     });
 
@@ -246,7 +248,19 @@ class _RecordingSheetState extends State<RecordingSheet>
   // ── Playback preview ──────────────────────────────────────────────────────
 
   Future<void> _setupPlayer(String path) async {
-    await _player.setFilePath(path);
+    if (kIsWeb) {
+      await _player.setUrl(path); // record returns a blob:// URL on web
+      // Browser populates duration asynchronously on loadedmetadata.
+      // Wait for the first non-null value before reading _player.duration.
+      await _player.durationStream
+          .firstWhere((d) => d != null)
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () => null,
+          );
+    } else {
+      await _player.setFilePath(path);
+    }
     _playTotal = _player.duration ?? Duration.zero;
 
     _positionSub = _player.positionStream.listen((pos) {
@@ -412,7 +426,7 @@ class _RecordingSheetState extends State<RecordingSheet>
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 400),
         pageBuilder: (_, _, _) =>
-            ResonanceScreen(pollId: widget.pollId, initialFocusTag: tag),
+            ResonanceScreen(pollId: widget.pollId, initialFocusTag: tag, showBackButton: true),
         transitionsBuilder: (_, anim, _, child) =>
             FadeTransition(opacity: anim, child: child),
       ),

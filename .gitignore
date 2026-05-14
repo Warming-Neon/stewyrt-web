@@ -64,3 +64,6 @@ service-account*.json
 
 # iOS Pods
 ios/Pods/
+
+# Editor state
+.continue/

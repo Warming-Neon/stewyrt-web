@@ -5,6 +5,58 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-14] — Debug Session 3: six-bug post-deploy fixes
+
+### Bug 1 — Chrome mobile web: nav icons centred, covering all content, taps non-functional
+- **`lib/main.dart`**: replaced `AppBar(toolbarHeight: 40)` with `PreferredSize(Size.fromHeight(40))` so Scaffold calculates body height correctly on web. Moved settings + theme-toggle icons into the `PreferredSize` appBar (narrow) and `Stack` bottomNav (wide). Changed bottomNav `Center(child: tabs)` → bare `tabs` `Row` with `mainAxisAlignment: center` — the `Center` wrapper was expanding to fill the unconstrained bottomNav height, collapsing the layout.
+
+### Bug 2 — Responses invisible: flash then vanish, "Be the first" shown despite Firestore data
+- **`lib/widgets/sentiment_stream.dart`**: `.where('blocked', isNotEqualTo: true)` → `.where('blocked', isEqualTo: false)`. The `isNotEqualTo` range filter has reconciliation lag on real-time listeners after a secondary-index update, causing the flash-then-vanish symptom.
+- **`lib/screens/resonance_native_screen.dart`** + **`lib/screens/resonance_web_screen.dart`**: same query fix at both Firestore subscription sites in each file (4 call sites total, `replace_all`). Existing composite index `(pollId ASC, blocked ASC, createdAt DESC)` covers `isEqualTo: false` — no new index needed.
+
+### Bug 3 — Preview player shows 0:00 / 0:00 on web after recording
+- **`lib/widgets/recording_sheet.dart`**: `_setupPlayer()` now awaits `_player.durationStream.firstWhere((d) => d != null).timeout(5s)` before reading `_player.duration`. The browser fires `loadedmetadata` asynchronously for `blob://` URLs so `duration` is `null` synchronously after `setUrl()`.
+
+### Bug 4 — Resonance back button overlaps header text; `canPop()` gate broken on web
+- **`lib/screens/resonance_native_screen.dart`** + **`lib/screens/resonance_web_screen.dart`**: `crossAxisAlignment: CrossAxisAlignment.start` → `center`; `textAlign: TextAlign.center` added to both header `Text` widgets. `Navigator.of(context).canPop()` condition replaced with `widget.showBackButton` bool; `Navigator.pop()` replaced with `Navigator.maybePop(context)`.
+- **`lib/screens/resonance_screen.dart`**: forwarded new `showBackButton` param to `ResonancePlatformScreen`.
+- **`lib/screens/pulse_screen.dart`**: `_viewResonance()` passes `showBackButton: true`.
+- **`lib/widgets/recording_sheet.dart`**: `_onTagTap()` `ResonanceScreen` push passes `showBackButton: true`.
+
+### Bug 5 — No way to skip Ice Breaker from Day One screen
+- **`lib/screens/day_one_screen.dart`**: Added "Maybe later" `TextButton` below the hold button in `_buildIdle()`. Sets `SharedPreferences('hasCompletedDayOne', true)` and `Navigator.pushReplacement` to `RootShell`.
+
+### Bug 6 — Mobile web nav bar overlap (resolved by Bug 1 fix)
+- Already resolved: the `isWide` responsive branch added in Bug 1 correctly routes settings/theme icons to the appBar on narrow viewports and leaves the Stack layout untouched on wide viewports. No additional changes required.
+
+---
+
+## [2026-05-14] — Debug pass: post-deploy smoke test fixes (Bugs 1–6)
+
+### Bug 1 — Android crash on Day One completion (`String not subtype of num?`)
+- **`lib/screens/archive_screen.dart`**: replaced hard `as num?` / `as Timestamp` casts in `_ArchivePoll.fromDoc()` with `is`-guarded checks and `int.tryParse` fallback. Firestore Console can write `total_submissions` as a String; the cast threw on `IndexedStack` mount.
+
+### Bug 2 — Waveform broken on web (Safari: invisible, Chrome: dots only)
+- **`lib/utils/limiter.dart`**: added `SoftLimiter.webProcess(db)` — linearly maps the `record` package's web `AnalyserNode.getFloatFrequencyData()` range (−60 to −5 dBFS) to 0.0–1.0, bypassing the native soft-knee compressor calibrated for −10 to −3 dBFS.
+- **`lib/screens/day_one_screen.dart`**, **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**: amplitude listener uses `SoftLimiter.webProcess` on `kIsWeb`, `SoftLimiter.process` on native.
+- **`lib/screens/day_one_screen.dart`**: added `const String _iceBreakerId = 'ice_breaker_v1'` and wired it as the `pollId` arg in the `uploadAudioClip` call — was previously passed as `''`, causing CF to store `pollId: ""` on all Ice Breaker responses.
+- **`scripts/fix_ice_breaker_poll_ids.js`** (new): idempotent backfill — finds `responses` with `pollId == ""` and question matching Ice Breaker text, batch-updates to `pollId: 'ice_breaker_v1'`; also corrects `polls/ice_breaker_v1.total_submissions` if stored as a String.
+
+### Bug 3 — Safari cannot swipe between question cards
+- **`lib/screens/pulse_screen.dart`**: `PageView.physics` set to `PageScrollPhysics()` on web (`ClampingScrollPhysics` doesn't snap via mouse/touch on WebKit).
+- **`lib/main.dart`**: added `dragDevices` override to `_BouncingScrollBehavior` — base `ScrollBehavior` excludes `PointerDeviceKind.mouse`; override adds mouse/stylus/unknown on web so Safari trackpad/click-drag swipe works.
+
+### Bug 4 — Recording hangs on web after release
+- **`lib/widgets/recording_sheet.dart`**: `_setupPlayer()` uses `player.setUrl(path)` on web (`record` returns a `blob://` URL; `setFilePath()` calls `Uri.file()` which corrupts `blob://` schemes), `setFilePath()` on native as before.
+
+### Bug 5 — Compliance banner not shown after account deletion
+- **`lib/screens/settings_screen.dart`**: post-deletion navigation changed from `OnboardingScreen` to `BootRouter`. `prefs.clear()` already clears all keys (`hasSeenComplianceBanner`, `hasPassedBouncer`, `hasCompletedDayOne`); routing through `BootRouter` re-runs `_init()` which evaluates `hasSeenComplianceBanner` and shows the compliance banner for that session.
+
+### Bug 6 — Mobile web nav bar icons overlapping tabs
+- **`lib/main.dart`**: `_RootShellState.build()` is now responsive on `MediaQuery.of(context).size.width >= 600`. Narrow (< 600px): adds a slim 40px `AppBar` housing settings (leading) and theme toggle (actions); bottom nav shows three tabs only with no `Stack`/`Positioned` elements. Wide (≥ 600px): previous Stack layout with positioned utility icons unchanged. Tab `Row` extracted as a local `tabs` variable to eliminate duplication.
+
+---
+
 ## [2026-05-13] — Kitchen-Cuppa: deferred items (Phases 4–8)
 
 ### Phase 4 — Microphone permission denied recovery

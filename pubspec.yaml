@@ -51,5 +51,5 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/icon/stewyrt_icon.png"
+  image_path: "assets/icon/stew_icon.png"
   min_sdk_android: 21

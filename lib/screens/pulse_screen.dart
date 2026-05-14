@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/poll_card.dart';
@@ -147,7 +148,7 @@ class _PulseScreenState extends State<PulseScreen> {
     Navigator.of(context).push(
       PageRouteBuilder(
         transitionDuration: const Duration(milliseconds: 400),
-        pageBuilder: (_, _, _) => ResonanceScreen(pollId: pollId),
+        pageBuilder: (_, _, _) => ResonanceScreen(pollId: pollId, showBackButton: true),
         transitionsBuilder: (_, anim, _, child) =>
             FadeTransition(opacity: anim, child: child),
       ),
@@ -225,7 +226,9 @@ class _PulseScreenState extends State<PulseScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                         child: PageView.builder(
                           controller: _pageController,
-                          physics: const ClampingScrollPhysics(),
+                          physics: kIsWeb
+                              ? const PageScrollPhysics()
+                              : const ClampingScrollPhysics(),
                           itemCount: polls.length,
                           itemBuilder: (context, index) {
                             final poll = polls[index];

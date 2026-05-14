@@ -315,7 +315,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         .onAmplitudeChanged(const Duration(milliseconds: 50))
         .listen((amp) {
       if (!mounted) return;
-      setState(() => _liveSamples.add(_limiter.process(amp.current)));
+      setState(() => _liveSamples.add(kIsWeb
+          ? SoftLimiter.webProcess(amp.current)
+          : _limiter.process(amp.current)));
     });
 
     setState(() => _isRecording = true);

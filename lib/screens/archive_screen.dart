@@ -27,14 +27,17 @@ class _ArchivePoll {
 
   factory _ArchivePoll.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final d = doc.data();
-    final ts = d['createdAt'];
+    final ts  = d['createdAt'];
+    final raw = d['total_submissions'];
     return _ArchivePoll(
       id:               doc.id,
-      question:         d['question']           as String? ?? '',
-      category:         d['category']           as String? ?? '',
-      topic:            d['topic']              as String? ?? '',
-      totalSubmissions: (d['total_submissions'] as num?)?.toInt() ?? 0,
-      createdAt:        ts != null ? (ts as Timestamp).toDate() : DateTime(2024),
+      question:         d['question'] as String? ?? '',
+      category:         d['category'] as String? ?? '',
+      topic:            d['topic']    as String? ?? '',
+      totalSubmissions: raw is num
+          ? raw.toInt()
+          : int.tryParse(raw?.toString() ?? '') ?? 0,
+      createdAt:        ts is Timestamp ? ts.toDate() : DateTime(2024),
     );
   }
 }

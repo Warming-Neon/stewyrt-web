@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -47,6 +49,17 @@ class _BouncingScrollBehavior extends ScrollBehavior {
   Widget buildOverscrollIndicator(
           BuildContext context, Widget child, ScrollableDetails details) =>
       child;
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => kIsWeb
+      ? {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.stylus,
+          PointerDeviceKind.invertedStylus,
+          PointerDeviceKind.unknown,
+        }
+      : super.dragDevices;
 }
 
 class StewyrtApp extends StatelessWidget {
@@ -103,8 +116,87 @@ class _RootShellState extends State<RootShell> {
     final borderColor = isDark
         ? const Color(0xFF1A1A1A)
         : const Color(0xFFEEEEEE);
+    final isWide = MediaQuery.of(context).size.width >= 600;
+
+    final tabs = Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        _NavItem(
+          label: 'Stewyrt',
+          icon: Icons.graphic_eq_rounded,
+          iconWidget: Text(
+            'S',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: _selectedIndex == 0 ? textColor : subColor,
+              height: 1,
+            ),
+          ),
+          selected: _selectedIndex == 0,
+          textColor: textColor,
+          subColor: subColor,
+          onTap: () => setState(() => _selectedIndex = 0),
+        ),
+        const SizedBox(width: 24),
+        _NavItem(
+          label: 'The Resonance',
+          icon: Icons.blur_on_rounded,
+          selected: _selectedIndex == 1,
+          textColor: textColor,
+          subColor: subColor,
+          onTap: () => setState(() => _selectedIndex = 1),
+        ),
+        const SizedBox(width: 24),
+        _NavItem(
+          label: 'The Archive',
+          icon: Icons.grid_view_rounded,
+          selected: _selectedIndex == 2,
+          textColor: textColor,
+          subColor: subColor,
+          onTap: () => setState(() => _selectedIndex = 2),
+        ),
+      ],
+    );
 
     return Scaffold(
+      appBar: isWide
+          ? null
+          : PreferredSize(
+              preferredSize: const Size.fromHeight(40),
+              child: SafeArea(
+                bottom: false,
+                child: Container(
+                  height: 40,
+                  color: bgColor,
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(Icons.settings_outlined, color: subColor, size: 20),
+                        ),
+                      ),
+                      const Spacer(),
+                      GestureDetector(
+                        onTap: themeNotifier.toggle,
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                            color: subColor,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
       body: IndexedStack(index: _selectedIndex, children: _screens),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -115,86 +207,40 @@ class _RootShellState extends State<RootShell> {
           top: false,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Centred tab pair
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _NavItem(
-                      label: 'Stewyrt',
-                      icon: Icons.graphic_eq_rounded,
-                      iconWidget: Text(
-                        'S',
-                        style: GoogleFonts.spaceGrotesk(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: _selectedIndex == 0 ? textColor : subColor,
-                          height: 1,
+            child: isWide
+                ? Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      tabs,
+                      Positioned(
+                        left: 4,
+                        child: GestureDetector(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(Icons.settings_outlined, color: subColor, size: 20),
+                          ),
                         ),
                       ),
-                      selected: _selectedIndex == 0,
-                      textColor: textColor,
-                      subColor: subColor,
-                      onTap: () => setState(() => _selectedIndex = 0),
-                    ),
-                    const SizedBox(width: 24),
-                    _NavItem(
-                      label: 'The Resonance',
-                      icon: Icons.blur_on_rounded,
-                      selected: _selectedIndex == 1,
-                      textColor: textColor,
-                      subColor: subColor,
-                      onTap: () => setState(() => _selectedIndex = 1),
-                    ),
-                    const SizedBox(width: 24),
-                    _NavItem(
-                      label: 'The Archive',
-                      icon: Icons.grid_view_rounded,
-                      selected: _selectedIndex == 2,
-                      textColor: textColor,
-                      subColor: subColor,
-                      onTap: () => setState(() => _selectedIndex = 2),
-                    ),
-                  ],
-                ),
-                // Settings icon pinned to the left
-                Positioned(
-                  left: 4,
-                  child: GestureDetector(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const SettingsScreen()),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Icon(
-                        Icons.settings_outlined,
-                        color: subColor,
-                        size: 20,
+                      Positioned(
+                        right: 4,
+                        child: GestureDetector(
+                          onTap: themeNotifier.toggle,
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                              color: subColor,
+                              size: 20,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ),
-                // Theme toggle pinned to the right
-                Positioned(
-                  right: 4,
-                  child: GestureDetector(
-                    onTap: themeNotifier.toggle,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Icon(
-                        isDark
-                            ? Icons.light_mode_rounded
-                            : Icons.dark_mode_rounded,
-                        color: subColor,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+                    ],
+                  )
+                : tabs,
           ),
         ),
       ),

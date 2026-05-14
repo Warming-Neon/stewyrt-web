@@ -8,12 +8,21 @@ import 'resonance_native_screen.dart'
     if (dart.library.js_interop) 'resonance_web_screen.dart';
 
 class ResonanceScreen extends StatelessWidget {
-  const ResonanceScreen({super.key, this.pollId, this.initialFocusTag});
+  const ResonanceScreen({
+    super.key,
+    this.pollId,
+    this.initialFocusTag,
+    this.showBackButton = false,
+  });
 
   final String? pollId;
   final String? initialFocusTag;
+  final bool showBackButton;
 
   @override
-  Widget build(BuildContext context) =>
-      ResonancePlatformScreen(pollId: pollId, initialFocusTag: initialFocusTag);
+  Widget build(BuildContext context) => ResonancePlatformScreen(
+        pollId:         pollId,
+        initialFocusTag: initialFocusTag,
+        showBackButton:  showBackButton,
+      );
 }

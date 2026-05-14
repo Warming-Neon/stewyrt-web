@@ -22,6 +22,7 @@ import '../main.dart';
 
 const String _dayOneQuestion =
     'Tell us about the last time you laughed so hard you cried.';
+const String _iceBreakerId = 'ice_breaker_v1';
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
@@ -175,7 +176,9 @@ class _DayOneScreenState extends State<DayOneScreen>
         .onAmplitudeChanged(const Duration(milliseconds: 50))
         .listen((amp) {
       if (!mounted) return;
-      setState(() => _liveSamples.add(_limiter.process(amp.current)));
+      setState(() => _liveSamples.add(kIsWeb
+          ? SoftLimiter.webProcess(amp.current)
+          : _limiter.process(amp.current)));
     });
 
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -234,7 +237,7 @@ class _DayOneScreenState extends State<DayOneScreen>
         filePath,
         uuid,
         _dayOneQuestion,
-        '',   // no poll ID — Day 1 is not tied to a Firestore poll
+        _iceBreakerId,
         uuid,
         extraMetadata: {'isDayOne': 'true'},
       );
@@ -446,6 +449,24 @@ class _DayOneScreenState extends State<DayOneScreen>
         Text(
           'Press and hold to record',
           style: GoogleFonts.spaceGrotesk(fontSize: 12, color: const Color(0xFFAAAAAA)),
+        ),
+        const SizedBox(height: 8),
+        TextButton(
+          onPressed: () async {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setBool('hasCompletedDayOne', true);
+            if (!mounted) return;
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const RootShell()),
+            );
+          },
+          child: Text(
+            'Maybe later',
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 13,
+              color: const Color(0xFFAAAAAA),
+            ),
+          ),
         ),
         const SizedBox(height: 32),
       ],

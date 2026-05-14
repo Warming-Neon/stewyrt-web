@@ -62,4 +62,22 @@ class SoftLimiter {
   /// True when the raw signal is entering the limiting zone — use to show
   /// a clip-warning indicator in the UI.
   bool isNearCeiling(double rawDb) => rawDb > threshold - kneeWidth;
+
+  /// Web-specific normalization for `AnalyserNode.getFloatFrequencyData()`.
+  ///
+  /// On web the `record` package routes through `MediaRecorderDelegate`, which
+  /// measures amplitude via Web Audio frequency-domain peaks. These land at
+  /// -50 to -5 dBFS for normal speech — far lower than native time-domain
+  /// peaks at -10 to -3 dBFS. The standard [process] pipeline discards almost
+  /// everything below -20 dBFS as near-silence, producing invisible bars.
+  ///
+  /// This maps the web's real amplitude range [-60, -5] → [0.0, 1.0] linearly
+  /// so waveform bars are visible. Native path is unaffected.
+  static double webProcess(double db) {
+    const double low  = -60.0;
+    const double high = -5.0;
+    if (db <= low) return 0.0;
+    if (db >= high) return 1.0;
+    return (db - low) / (high - low);
+  }
 }

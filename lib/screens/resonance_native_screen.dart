@@ -9,10 +9,16 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../services/resonance_controller.dart';
 
 class ResonancePlatformScreen extends StatefulWidget {
-  const ResonancePlatformScreen({super.key, this.pollId, this.initialFocusTag});
+  const ResonancePlatformScreen({
+    super.key,
+    this.pollId,
+    this.initialFocusTag,
+    this.showBackButton = false,
+  });
 
   final String? pollId;
   final String? initialFocusTag;
+  final bool showBackButton;
 
   @override
   State<ResonancePlatformScreen> createState() => _ResonanceNativeScreenState();
@@ -67,7 +73,7 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
       _firestoreSub = FirebaseFirestore.instance
           .collection('responses')
           .where('pollId', isEqualTo: providedPollId)
-          .where('blocked', isNotEqualTo: true)
+          .where('blocked', isEqualTo: false)
           .orderBy('createdAt', descending: true)
           .limit(300)
           .snapshots()
@@ -88,7 +94,7 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
         _firestoreSub = FirebaseFirestore.instance
             .collection('responses')
             .where('pollId', isEqualTo: pollId)
-            .where('blocked', isNotEqualTo: true)
+            .where('blocked', isEqualTo: false)
             .orderBy('createdAt', descending: true)
             .limit(300)
             .snapshots()
@@ -208,11 +214,12 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         'The Resonance',
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.spaceGrotesk(
                           fontSize: 24,
                           fontWeight: FontWeight.w600,
@@ -222,6 +229,7 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
                       const SizedBox(height: 4),
                       Text(
                         'Live global sentiment',
+                        textAlign: TextAlign.center,
                         style: GoogleFonts.spaceGrotesk(
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
@@ -260,7 +268,7 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
               ),
             ),
           ),
-          if (Navigator.of(context).canPop())
+          if (widget.showBackButton)
             Positioned(
               top: 0,
               left: 0,
@@ -268,7 +276,7 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 16, left: 16),
                   child: GestureDetector(
-                    onTap: () => Navigator.of(context).pop(),
+                    onTap: () => Navigator.maybePop(context),
                     child: Container(
                       width: 44,
                       height: 44,

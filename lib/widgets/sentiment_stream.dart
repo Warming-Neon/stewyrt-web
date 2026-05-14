@@ -105,7 +105,7 @@ class _SentimentStreamState extends State<SentimentStream> {
     return FirebaseFirestore.instance
         .collection('responses')
         .where('pollId', isEqualTo: widget.pollId)
-        .where('blocked', isNotEqualTo: true)
+        .where('blocked', isEqualTo: false)
         .orderBy('createdAt', descending: true)
         .limit(30)
         .snapshots();
