@@ -221,7 +221,7 @@ class _DayOneScreenState extends State<DayOneScreen>
       _currentStory = _generateNewStory();
     });
 
-    _phraseTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+    _phraseTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) {
       if (!mounted) return;
       setState(() {
         _storyIndex++;

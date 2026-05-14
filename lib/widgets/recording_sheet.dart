@@ -250,14 +250,6 @@ class _RecordingSheetState extends State<RecordingSheet>
   Future<void> _setupPlayer(String path) async {
     if (kIsWeb) {
       await _player.setUrl(path); // record returns a blob:// URL on web
-      // Browser populates duration asynchronously on loadedmetadata.
-      // Wait for the first non-null value before reading _player.duration.
-      await _player.durationStream
-          .firstWhere((d) => d != null)
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () => null,
-          );
     } else {
       await _player.setFilePath(path);
     }
@@ -345,7 +337,7 @@ class _RecordingSheetState extends State<RecordingSheet>
     });
     debugPrint('[STEWYRT][SUBMIT] State → waiting');
 
-    _phraseTimer = Timer.periodic(const Duration(milliseconds: 800), (_) {
+    _phraseTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) {
       if (!mounted) return;
       setState(() {
         _storyIndex++;
@@ -721,9 +713,15 @@ class _RecordingSheetState extends State<RecordingSheet>
                             fontSize: 11, fontWeight: FontWeight.w600, color: fg,
                           ),
                         ),
-                        Text(
-                          _fmtDuration(_playTotal),
-                          style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub),
+                        StreamBuilder<Duration?>(
+                          stream: _player.durationStream,
+                          builder: (context, snapshot) {
+                            final d = snapshot.data ?? Duration.zero;
+                            return Text(
+                              _fmtDuration(d),
+                              style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub),
+                            );
+                          },
                         ),
                       ],
                     ),

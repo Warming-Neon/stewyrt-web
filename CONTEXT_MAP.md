@@ -540,8 +540,8 @@ idle → recording → previewing → waiting → results
 
 - **idle:** press-and-hold button
 - **recording:** live waveform (`_LiveWaveformPainter`, 60 bars, 50ms amplitude polling), 30s hard cutoff, `SoftLimiter` applied to each dBFS sample
-- **previewing:** playback player with `_PlaybackWaveformPainter`, re-record / submit
-- **waiting:** rotating story phrases from `PhraseService.instance.generateStory()` (4 acts × random lines, fetched from Firestore `waiting_phrases`), `_phraseTimer` at 800ms
+- **previewing:** playback player with `_PlaybackWaveformPainter`, re-record / submit. Right-side duration counter is a `StreamBuilder<Duration?>` on `_player.durationStream` (live — resolves asynchronously for `blob://` URLs on web).
+- **waiting:** rotating story phrases from `PhraseService.instance.generateStory()` (4 acts × random lines, fetched from Firestore `waiting_phrases`), `_phraseTimer` at 1200ms
 - **results:** staggered `AnimatedOpacity` reveal — tone (0ms), flavor (400ms), essence (800ms), summary (1400ms), Done button (1900ms)
 - **blocked:** soft-block — amber `headset_off_outlined` icon, "We couldn't share this one" headline, two-button row: "Try again" (outline, resets to idle) + "Request review" (amber filled, calls `submitModerationReview` with `_blockedResponseId`)
 
@@ -800,7 +800,7 @@ final bg  = isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
 
 **`PollCard` tier labels:** card header reads from `PollData.tier` (Firestore `polls/{id}['tier']`, defaults `'pulse'`). Values: `'horizon'` → **HORIZON**, `'ice_breaker'` → **ICE BREAKER**, anything else → **THE PULSE**. Pulse questions are never labelled by category name.
 
-**Pulse screen PageView:** Fixed 3-slot `PageView` — slot 0 = Pulse, slot 1 = Horizon, slot 2 = Ice Breaker. Missing tiers yield `PollData.placeholder(tier)` (40% opacity, `onTap: null`). `_buildRotationStream()` is an `async*` generator — Ice Breaker fetched once before the live loop, Pulse/Horizon streamed via `whereIn`. Active index derived from `_pageController.page?.round()` via a scroll listener, never stored as separate state.
+**Pulse screen PageView:** Fixed 3-slot `PageView` — slot 0 = Pulse, slot 1 = Horizon, slot 2 = Ice Breaker. Missing tiers yield `PollData.placeholder(tier)` (40% opacity, `onTap: null`). `_buildRotationStream()` is an `async*` generator — Ice Breaker fetched once before the live loop, Pulse/Horizon streamed via `whereIn`. Active index derived from `_pageController.page?.round()` via a scroll listener, never stored as separate state. The `_openRecording` call site uses `currentPoll.question / currentPoll.id` (not the per-card `poll` from `itemBuilder`) to guarantee the active card's pollId reaches `RecordingSheet` and, subsequently, the Resonance navigation.
 
 **Chips:** `_TagChip` / `_Chip` — small allcaps label + larger value, rounded 12px container.
 

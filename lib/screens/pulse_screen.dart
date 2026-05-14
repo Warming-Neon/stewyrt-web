@@ -236,7 +236,7 @@ class _PulseScreenState extends State<PulseScreen> {
                               question:        poll.question,
                               category:        poll.category,
                               tier:            poll.tier,
-                              onTap:           poll.isPlaceholder ? null : () => _openRecording(poll.question, poll.id),
+                              onTap:           poll.isPlaceholder ? null : () => _openRecording(currentPoll.question, currentPoll.id),
                               onViewResonance: poll.isPlaceholder ? null : () => _viewResonance(poll.id),
                             );
                             return poll.isPlaceholder

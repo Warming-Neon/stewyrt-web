@@ -5,6 +5,23 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-14] — Fix: phrase timing, preview duration, pollId routing to Resonance
+
+### Fix 1 — Phrase cycling slowed: 800ms → 1200ms
+- **`lib/screens/day_one_screen.dart`**: `_phraseTimer` interval changed from `Duration(milliseconds: 800)` to `Duration(milliseconds: 1200)` in `_submit()`.
+- **`lib/widgets/recording_sheet.dart`**: same change in the waiting-room `_phraseTimer` inside `_onSubmit()`.
+- `lib/screens/onboarding_screen.dart` left unchanged — its verifying-spinner uses 1500ms, a separate timer with a different purpose.
+
+### Fix 2 — Preview duration counter stuck at 0:00 (web)
+- **`lib/widgets/recording_sheet.dart`**: removed the `durationStream.firstWhere(...).timeout(5s)` await from `_setupPlayer()`. Even after the await resolved, `_player.duration` was returning `null` (the stream value and the getter are not in sync at the point of read), leaving `_playTotal` as `Duration.zero`.
+- Right-side duration `Text` in `_buildPreviewing()` replaced with a `StreamBuilder<Duration?>` that subscribes to `_player.durationStream` directly, updating live as the browser resolves `loadedmetadata` for the `blob://` URL. Left-side position counter and progress calculation left unchanged.
+
+### Fix 3 — Tag chip navigated to wrong Resonance (pollId routing)
+- **`lib/screens/pulse_screen.dart`**: `_openRecording` call site in the PageView `itemBuilder` changed from `poll.question / poll.id` to `currentPoll.question / currentPoll.id`. The per-card `poll` variable (from the `itemBuilder` index parameter) and the active-card `currentPoll` variable are logically the same in normal use, but differ if a tap fires during a mid-swipe transition (`index != activeIdx`). Using `currentPoll` guarantees the actually-visible card's pollId reaches `RecordingSheet.widget.pollId`, which `_onTagTap` then forwards to `ResonanceScreen(pollId:)`.
+- **`lib/widgets/recording_sheet.dart`**: `_onTagTap` already passes `widget.pollId` to `ResonanceScreen` — no change needed.
+
+---
+
 ## [2026-05-14] — Debug Session 3: six-bug post-deploy fixes
 
 ### Bug 1 — Chrome mobile web: nav icons centred, covering all content, taps non-functional
