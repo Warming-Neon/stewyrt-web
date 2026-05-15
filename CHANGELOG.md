@@ -5,6 +5,22 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-15] — Feat: pollId deep-link from feed chips; back-button fixes; debug print cleanup
+
+### Feed chip → Resonance deep-link
+- **`lib/widgets/sentiment_stream.dart`**: `_FeedPlayerSheet` now receives `pollId`; chip taps (`TONE`, `FLAVOR`, `ESSENCE`) call `ResonanceController.goToResonanceAndFocus(tag, pollId: pollId)`, which pushes a new `ResonanceScreen` instance scoped to that poll rather than tab-switching to the current poll.
+- **`lib/services/resonance_controller.dart`**: `registerTabSwitcher` now accepts a `BuildContext`; `goToResonanceAndFocus` pushes a fade-transition route when `pollId` is provided; `resonanceScreenBuilder` callback avoids circular imports.
+- **`lib/main.dart`**: passes `context` to `registerTabSwitcher` and sets `ResonanceController.resonanceScreenBuilder` at root-shell init.
+
+### Back button improvements
+- **`resonance_web_screen.dart`**: back button changed from `GestureDetector`/`Container` to `TextButton` (proper hit-testing, `CircleBorder` shape).
+- **`resonance_native_screen.dart`**: back tap guards with `canPop()` before calling `pop()`.
+
+### Debug print cleanup
+Removed 7 temporary `debugPrint` statements (`[FEED CHIP TAP]`, `[RECORDING]`, `[TAG TAP]`, `[RESONANCE]`) from `sentiment_stream.dart`, `recording_sheet.dart`, `resonance_web_screen.dart`, and `resonance_native_screen.dart`.
+
+---
+
 ## [2026-05-14] — The Resonance UI overhaul (Phases 1–6): cosmic nebula, no bloom, brain outline, always-on labels, perf tier, warm colours
 
 All changes confined to `web/brain_visualizer.html`.

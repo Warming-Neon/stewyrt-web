@@ -51,7 +51,7 @@ stewyrt/
 │   │   ├── upload_bytes_io.dart          — Native impl: File.readAsBytes()
 │   │   ├── upload_bytes_web.dart         — Web impl: fetch() + arrayBuffer() via dart:js_interop
 │   │   ├── auth_service.dart             — signInAnonymously()
-│   │   └── resonance_controller.dart     — Static coordinator: tab switching + focus callbacks
+│   │   └── resonance_controller.dart     — Static coordinator: tab switching, focus callbacks, and pollId deep-link push (goToResonanceAndFocus)
 │   │
 │   ├── theme/
 │   │   ├── app_theme.dart                — Light/dark ThemeData, Space Grotesk text theme

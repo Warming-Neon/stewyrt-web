@@ -96,7 +96,10 @@ class _RootShellState extends State<RootShell> {
     super.initState();
     ResonanceController.registerTabSwitcher(
       (i) => setState(() => _selectedIndex = i),
+      context,
     );
+    ResonanceController.resonanceScreenBuilder = (pollId, tag) =>
+        ResonanceScreen(pollId: pollId, initialFocusTag: tag, showBackButton: true);
   }
 
   static final _screens = [

@@ -39,7 +39,6 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
   @override
   void initState() {
     super.initState();
-    debugPrint('[RESONANCE] pollId received: ${widget.pollId}');
     ResonanceController.registerFocus(_focusNode);
     if (widget.initialFocusTag != null) _pendingFocusTag = widget.initialFocusTag;
 
@@ -277,7 +276,11 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(top: 16, left: 16),
                   child: GestureDetector(
-                    onTap: () => Navigator.maybePop(context),
+                    onTap: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      }
+                    },
                     child: Container(
                       width: 44,
                       height: 44,

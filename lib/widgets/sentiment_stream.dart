@@ -125,7 +125,11 @@ class _SentimentStreamState extends State<SentimentStream> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _FeedPlayerSheet(items: items, initialIndex: index),
+      builder: (_) => _FeedPlayerSheet(
+        items: items,
+        initialIndex: index,
+        pollId: widget.pollId,
+      ),
     );
   }
 
@@ -298,8 +302,13 @@ class _SentimentStreamState extends State<SentimentStream> {
 class _FeedPlayerSheet extends StatefulWidget {
   final List<ResponseItem> items;
   final int initialIndex;
+  final String pollId;
 
-  const _FeedPlayerSheet({required this.items, required this.initialIndex});
+  const _FeedPlayerSheet({
+    required this.items,
+    required this.initialIndex,
+    required this.pollId,
+  });
 
   @override
   State<_FeedPlayerSheet> createState() => _FeedPlayerSheetState();
@@ -469,7 +478,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
                 onTap: item.tone.isEmpty ? null : () {
                   HapticFeedback.lightImpact();
                   Navigator.of(context).pop();
-                  ResonanceController.goToResonanceAndFocus(item.tone);
+                  ResonanceController.goToResonanceAndFocus(item.tone, pollId: widget.pollId);
                 },
               )),
               const SizedBox(width: 8),
@@ -477,7 +486,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
                 onTap: item.flavor.isEmpty ? null : () {
                   HapticFeedback.lightImpact();
                   Navigator.of(context).pop();
-                  ResonanceController.goToResonanceAndFocus(item.flavor);
+                  ResonanceController.goToResonanceAndFocus(item.flavor, pollId: widget.pollId);
                 },
               )),
               const SizedBox(width: 8),
@@ -485,7 +494,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
                 onTap: item.essence.isEmpty ? null : () {
                   HapticFeedback.lightImpact();
                   Navigator.of(context).pop();
-                  ResonanceController.goToResonanceAndFocus(item.essence);
+                  ResonanceController.goToResonanceAndFocus(item.essence, pollId: widget.pollId);
                 },
               )),
             ],

@@ -48,7 +48,6 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
   @override
   void initState() {
     super.initState();
-    debugPrint('[RESONANCE] pollId received: ${widget.pollId}');
     _focusFired = false;
     if (widget.initialFocusTag != null) _pendingFocusTag = widget.initialFocusTag;
 
@@ -347,20 +346,18 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
               child: SafeArea(
                 child: Padding(
                   padding: const EdgeInsets.only(top: 16, left: 16),
-                  child: GestureDetector(
-                    onTap: () => Navigator.maybePop(context),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(44, 44),
+                      padding: EdgeInsets.zero,
+                      backgroundColor: Colors.black.withValues(alpha: 0.4),
+                      shape: const CircleBorder(),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      color: Colors.white,
+                      size: 18,
                     ),
                   ),
                 ),
