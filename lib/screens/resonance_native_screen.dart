@@ -39,6 +39,7 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('[RESONANCE] pollId received: ${widget.pollId}');
     ResonanceController.registerFocus(_focusNode);
     if (widget.initialFocusTag != null) _pendingFocusTag = widget.initialFocusTag;
 

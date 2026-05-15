@@ -28,7 +28,7 @@ class ResonanceWebScreen extends StatefulWidget {
   State<ResonanceWebScreen> createState() => _ResonanceWebScreenState();
 }
 
-class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
+class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware {
   // Static so they survive hot-reload and state recreation.
   static bool _viewRegistered = false;
   static web.HTMLIFrameElement? _iframe;
@@ -48,6 +48,7 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('[RESONANCE] pollId received: ${widget.pollId}');
     _focusFired = false;
     if (widget.initialFocusTag != null) _pendingFocusTag = widget.initialFocusTag;
 
@@ -92,6 +93,40 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
       _viewRegistered = true;
     }
 
+    _startSubscription();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) ResonanceController.routeObserver.subscribe(this, route);
+  }
+
+  @override
+  void didPushNext() {
+    _pollSub?.cancel();
+    _pollSub = null;
+    _firestoreSub?.cancel();
+    _firestoreSub = null;
+  }
+
+  @override
+  void didPopNext() {
+    _currentPollId = null;
+    _startSubscription();
+  }
+
+  @override
+  void dispose() {
+    ResonanceController.routeObserver.unsubscribe(this);
+    ResonanceController.unregisterFocus();
+    _pollSub?.cancel();
+    _firestoreSub?.cancel();
+    super.dispose();
+  }
+
+  void _startSubscription() {
     final providedPollId = widget.pollId;
     if (providedPollId != null) {
       _currentPollId = providedPollId;
@@ -126,14 +161,6 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> {
             .listen(_processSnapshot);
       });
     }
-  }
-
-  @override
-  void dispose() {
-    ResonanceController.unregisterFocus();
-    _pollSub?.cancel();
-    _firestoreSub?.cancel();
-    super.dispose();
   }
 
   void _processSnapshot(QuerySnapshot<Map<String, dynamic>> snap) {

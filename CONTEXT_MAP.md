@@ -652,27 +652,68 @@ void _inject(String jsonString) {
 
 ## brain_visualizer.html — Three.js WebGL (The Resonance)
 
-**Tech:** Three.js r0.161.0 via importmap, `EffectComposer`, `UnrealBloomPass`, `OrbitControls`
+**Tech:** Three.js r0.161.0 via importmap, `OrbitControls`. No post-processing — direct `renderer.render(scene, camera)`.
 
 **Nodes are fully dynamic — none are hardcoded.** All emotion synapse nodes are created at runtime from the Flutter message bridge.
 
-**120 filler synapse nodes** are created on load at low emissive intensity to give the scene volume before data arrives.
+**Performance tier** — detected at startup via `WEBGL_debug_renderer_info` + `navigator.deviceMemory`:
+- `high`: 1200 nebula particles (ShaderMaterial), 120 filler orbs, 1–3 comets/path, icosahedron detail 2, pixel ratio ≤ 2
+- `low`: 400 nebula particles (PointsMaterial), 50 filler orbs, 1 comet/path, detail 1, pixel ratio ≤ 1.5
+
+### Background & Atmosphere
+
+- Scene background `#030420`, fog `THREE.FogExp2(#0a0820, 0.012)`
+- **Nebula**: soft-circle particles via `ShaderMaterial` (`gl_PointCoord` discard) at sizes 0.8–3.0, palette of deep purples/indigo/magenta/teal with 7% violet accent `#6a0aff`, spread across ±200 units
+- **Filler depth orbs**: 50–120 small icosahedra in near-black palette (`#1a0a2e` etc.), `emissiveIntensity: 0.25`
+- **Point lights**: `#8855ff` (upper-right), `#ff2266` (lower-left), `#aa44ff` (top-centre)
+
+### Brain Ghost Outline
+
+Four `CatmullRomCurve3` `THREE.Line` arcs at `#2a1a4e` / opacity 0.22–0.35:
+1. Left hemisphere arc: `(0,2,8) → (-6,8,4) → (-8,6,-2) → (-6,2,-8) → (-2,-2,-8) → (0,-4,-4)`
+2. Right hemisphere: mirror X
+3. Corpus callosum hint: shallow top-centre arc
+4. Cerebellum suggestion: small back-bottom arc around `(0,-7,-11)`
+
+### Region Zone Labels
+
+Five `THREE.Sprite` objects always facing the camera at region centroids:
+
+| Label | Position |
+|-------|----------|
+| Prefrontal | (0, 4, 8) |
+| Amygdala | (0, −5, −3) |
+| Nucleus | (0, 4, −2) |
+| Insula | (±12, 0, 0) |
+
+Colour `#6a4aff`, opacity 0.5. Fades to 0.2 when any data node is within 3 world units.
 
 ### Node Anatomy (Organic Synapses)
 
-Each emotion node is a `THREE.Group` at world-space position containing two meshes:
+Each emotion node is a `THREE.Group` at world-space position containing two meshes + one sprite:
 
-- **Core** — `IcosahedronGeometry` at 40% of the node radius. `MeshBasicMaterial({ color: 0xffffff })` — pure white, punches through bloom as a blinding glowing centre.
-- **Membrane** — `IcosahedronGeometry` at full radius, vertices randomly displaced ±6% for organic deformation. `MeshStandardMaterial` with the region's hue, `transparent: true`, `opacity: 0.55`. `emissiveIntensity` starts at 1.5 (birth flash) and decays to 0.2 baseline over ~1s.
+- **Core** — `IcosahedronGeometry` at 40% radius. `MeshStandardMaterial({ color: 0xffffff, emissive: nodeColor, emissiveIntensity: 1.2 })` — white-hot centre.
+- **Membrane** — `IcosahedronGeometry` at full radius, vertices randomly displaced ±6%. `MeshStandardMaterial` with region colour (`roughness: 0.4`), `opacity: 0.55`. `emissiveIntensity` starts at 2.5 (birth flash) and decays to 0.4 baseline.
+- **Always-on label** — `THREE.Sprite` 1.5 units above centre; bold 14px white, 128×32 canvas. Opacity 0.6–1.0 by node radius; fades near camera (< 8 units) or when screen-overlapped by a larger node (< 0.3).
 
 Scale encodes percentage: `pct 0–50 → group scale 0.7–3.0`.
+
+### Region Colour Palette (`regionColor()` → `{h,s,l}`)
+
+| Region | Hue range | Saturation | Lightness | Colours |
+|--------|-----------|-----------|----------|---------|
+| Prefrontal | 0.70–0.82 | 0.85–1.0 | 0.55–0.70 | Violets → blue-purple |
+| Amygdala | 0.95–1.08 (wraps) | 0.90–1.0 | 0.55–0.65 | Warm pinks → crimsons |
+| Nucleus | 0.12–0.28 | 0.80–0.95 | 0.55–0.65 | Ambers → warm greens |
+| Insula | 0.48–0.58 | 0.85–1.0 | 0.50–0.65 | Teals → cyans |
 
 ### State Maps
 
 - `nodeMeshes` — membrane `THREE.Mesh[]` for raycaster + animation loop
 - `nodeDataMap` — `mesh.uuid → emotion data` (both core and membrane registered for raycasting)
 - `nodesByName` — `name → emotion data` for O(1) existence check
-- `pathObjects` — `{ curve, line, activePulses[] }[]` for animation loop
+- `pathObjects` — `{ curve, color, line, nextFireAt, activePulses[] }[]` for animation loop
+- `regionLabels` — `{ sprite, pos }[]` for per-frame opacity update
 
 ### Region Coordinate Bounds
 
@@ -683,32 +724,23 @@ Scale encodes percentage: `pct 0–50 → group scale 0.7–3.0`.
 | Nucleus | −6 → +6 | 0 → +8 | −6 → +4 |
 | Insula | ±8 → ±16 (alternates sides) | −5 → +5 | −5 → +5 |
 
-### Region Hue Palette (THREE.Color HSL)
-
-| Region | Hue range | Colours |
-|--------|-----------|---------|
-| Prefrontal | 0.61–0.78 | Blues → purples |
-| Amygdala | 0.00–0.10 | Reds → oranges |
-| Nucleus | 0.19–0.36 | Yellows → greens |
-| Insula | 0.44–0.56 | Teals → cyans |
-
 ### On New Emotion
 
-1. `createNode(name, pct, region)` — picks random collision-checked position in region bounds, builds Group (core + membrane), registers in all three maps
+1. `createNode(name, pct, region)` — picks collision-checked position, builds Group (core + membrane) + label sprite, registers in all maps
 2. `updateCameraAnchor()` — recentres OrbitControls target on the centroid of all nodes
 
 ### On Existing Emotion Update
 
 - Rescale group (`pct 0–50 → scale 0.7–3.0`)
-- Spike membrane `emissiveIntensity` to 1.5, reset `_flashTime` to 0
+- Spike membrane `emissiveIntensity` to 2.5, reset `_flashTime` to 0
 
 ### Paths & Speedy Fuses
 
-Paths are **only** created from the explicit `edges` array in the Flutter payload. There is no proximity-based or random connection logic.
+Paths are **only** created from the explicit `edges` array in the Flutter payload. No proximity-based or random connection logic.
 
 Each edge becomes a `CatmullRomCurve3` with a random midpoint offset, rendered as a dim `LineBasicMaterial` line (`opacity` scales with edge weight: `w=1 → 0.10`, `w=10 → 0.41`, max 0.55).
 
-**Speedy Fuses:** Each path fires a cluster of 1–3 fast comets at random intervals (2–8s). Comets traverse the full path in ~0.8–1.6s (`emissiveIntensity: 4.0`). `clearPaths()` removes all lines and active comets from the scene before rebuilding from a new payload.
+**Speedy Fuses:** Each path fires 1 (low tier) or 1–3 (high tier) comets at random intervals (2–8s). Comets traverse the full path in ~0.8–1.6s (`emissiveIntensity: 2.0`). `clearPaths()` removes all lines and active comets before rebuilding from a new payload.
 
 ### Message Bridge
 
@@ -726,13 +758,13 @@ window.addEventListener('message', e => { processBrainData(typeof e.data === 'st
 - `{ focus: 'NodeName' }` → camera tween to that node, show tooltip
 - `{ nodes: [...], edges: [...] }` → create/update nodes, rebuild edges
 
-**Ready signal:** `if (typeof BrainChannel !== 'undefined') BrainChannel.postMessage('ready')` fires at the end of the module script. This is a no-op in a browser; in `webview_flutter` it signals Flutter that Three.js is fully initialised.
+**Ready signal:** `if (typeof BrainChannel !== 'undefined') BrainChannel.postMessage('ready')` fires at the end of the module script. No-op in a browser; in `webview_flutter` it signals Flutter that Three.js is fully initialised.
 
 ### Interaction
 
-- `Raycaster` click on membrane or core → `#tooltip` div (black bg, off-white Space Grotesk, 1px white border)
+- `Raycaster` tap on membrane or core → `#tooltip` div showing **percentage only** (`"24.6%"` centred, black bg, 1px white border). Emotion word is on the always-on sprite label instead.
 - `focusOnNode(name)` — programmatic camera tween (`_focusTween` state, 1.2s cubic ease-in-out), opens tooltip at tween end
-- Clicking empty space hides tooltip
+- Tapping empty space hides tooltip
 
 ---
 

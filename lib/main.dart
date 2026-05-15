@@ -75,6 +75,7 @@ class StewyrtApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: themeNotifier.mode,
       scrollBehavior: _BouncingScrollBehavior(),
+      navigatorObservers: [ResonanceController.routeObserver],
       home: const BootRouter(),
     );
   }

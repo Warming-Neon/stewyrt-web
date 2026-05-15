@@ -5,6 +5,19 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-14] — The Resonance UI overhaul (Phases 1–6): cosmic nebula, no bloom, brain outline, always-on labels, perf tier, warm colours
+
+All changes confined to `web/brain_visualizer.html`.
+
+- **Phase 1 — Cosmic nebula background:** scene background `#030420`, fog `#0a0820` density `0.012`. Nebula upgraded to 1200 soft-circle particles via `ShaderMaterial` (`gl_PointCoord` discard) across ±200 units; palette of deep purples/indigo/dark magenta/teal with 7% violet accent `#6a0aff`. Filler depth orb palette shifted to near-black indigo/purple; emissive `0.4→0.25`.
+- **Phase 2 — Bloom removed:** `EffectComposer`, `RenderPass`, `UnrealBloomPass` imports deleted entirely. Render loop uses `renderer.render(scene, camera)` directly. Core mesh changed from `MeshBasicMaterial` to `MeshStandardMaterial` with white colour + node-colour emissive at 1.2 to compensate. Membrane birth flash `1.5→2.5`, decay baseline `0.2→0.4`. Comet emissive `4.0→2.0`.
+- **Phase 3 — Brain ghost outline + region labels:** four `CatmullRomCurve3` `THREE.Line` arcs (left/right hemispheres, corpus callosum hint, cerebellum suggestion) at `#2a1a4e` opacity 0.22–0.35. Five `THREE.Sprite` region labels (`Prefrontal`, `Amygdala`, `Nucleus`, `Insula` ×2) at `#6a4aff` opacity 0.5; fade to 0.2 when a data node is within 3 world units.
+- **Phase 4 — Always-on node labels + tap shows % only:** every emotion node gets a billboarded `THREE.Sprite` label (bold 14px white, 128×32 canvas) 1.5 units above centre. Opacity 0.6–1.0 by node radius; fades to 0 when camera < 8 units; fades to 0.3 when screen-overlapped by a larger node. Tooltip on tap now shows percentage only (`"24.6%"` centred) — emotion word removed from tooltip (already on the always-on label).
+- **Phase 5 — Performance tier:** `detectPerformanceTier()` reads `WEBGL_debug_renderer_info` GPU string and `navigator.deviceMemory`. `low` tier: nebula 400 pts + `PointsMaterial` (no shader compile), filler 50 nodes, comets capped at 1 per path, icosahedron detail 1, pixel ratio capped at 1.5. `high` tier: 1200 pts + `ShaderMaterial`, 120 fillers, 1–3 comets, detail 2, pixel ratio ≤ 2.
+- **Phase 6 — Warmer node colours:** `regionColor()` replaces `regionHue()`, returning `{h,s,l}`. Prefrontal `0.70–0.82`/sat `0.85–1.0`; Amygdala `0.95–1.08` (wraps through pink/crimson)/sat `0.9–1.0`; Nucleus `0.12–0.28` (amber/warm green); Insula `0.48–0.58`. Membrane roughness `0.8→0.4`. Point lights shifted to violet palette: `#5566ff→#8855ff`, `#ff3366→#ff2266`, `#00ffaa→#aa44ff`.
+
+---
+
 ## [2026-05-14] — Fix: phrase timing, preview duration, pollId routing to Resonance
 
 ### Fix 1 — Phrase cycling slowed: 800ms → 1200ms

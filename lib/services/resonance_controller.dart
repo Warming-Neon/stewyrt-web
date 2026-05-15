@@ -1,7 +1,10 @@
-// Coordinates tab switching and Resonance focus requests across the app.
-// Platform screens self-register their focus callbacks so this file
-// has zero platform-specific imports and is safe to use anywhere.
+import 'package:flutter/widgets.dart';
+
+// Coordinates tab switching, Resonance focus requests, and route observation
+// across the app. Zero platform-specific imports — safe to use anywhere.
 class ResonanceController {
+  static final routeObserver = RouteObserver<ModalRoute<void>>();
+
   static void Function(int)? _switchTab;
   static void Function(String)? _focus;
 
