@@ -17,12 +17,10 @@ class ResonanceWebScreen extends StatefulWidget {
     super.key,
     this.pollId,
     this.initialFocusTag,
-    this.showBackButton = false,
   });
 
   final String? pollId;
   final String? initialFocusTag;
-  final bool showBackButton;
 
   @override
   State<ResonanceWebScreen> createState() => _ResonanceWebScreenState();
@@ -32,18 +30,22 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
   // Static so they survive hot-reload and state recreation.
   static bool _viewRegistered = false;
   static web.HTMLIFrameElement? _iframe;
-  // Last serialised payload — replayed when the iframe fires its load event,
-  // covering the race where Firestore resolves before the iframe JS is ready.
+  // Last serialised payload — replayed when the iframe fires its load event.
   static String? _pendingPayload;
-  // Focus tag to deliver once the iframe is loaded AND data has been sent.
+  // Focus tag to deliver once the iframe is loaded AND nodes are built.
   static String? _pendingFocusTag;
   static bool _iframeLoaded = false;
   static bool _focusFired = false;
+  // True only after a payload has been successfully posted for the current
+  // poll scope — reset on every scope change so we never fire focus against
+  // nodes from a previous question.
+  static bool _nodesReady = false;
 
   bool _hasData = false;
   StreamSubscription? _pollSub;
   StreamSubscription? _firestoreSub;
   String? _currentPollId;
+  String? _runtimePollId;
 
   @override
   void initState() {
@@ -54,8 +56,15 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
     ResonanceController.registerFocus((tag) {
       _pendingFocusTag = tag;
       _focusFired = false;
-      if (_iframeLoaded) _triggerFocus(tag);
+      // Only fire immediately if nodes for the current scope are already built.
+      if (_iframeLoaded && _nodesReady) {
+        _focusFired = true;
+        _pendingFocusTag = null;
+        _post(jsonEncode({'focus': tag}));
+      }
     });
+
+    ResonanceController.registerScopeChanger(_changePollScope);
 
     if (!_viewRegistered) {
       ui_web.platformViewRegistry.registerViewFactory(
@@ -75,14 +84,9 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
             ((web.Event _) {
               _iframeLoaded = true;
               final p = _pendingPayload;
-              if (p != null) _post(p);
-              // If data arrived before iframe loaded, fire focus now.
-              final tag = _pendingFocusTag;
-              if (tag != null && !_focusFired) {
-                Future.delayed(
-                  const Duration(milliseconds: 600),
-                  () => _triggerFocus(tag),
-                );
+              if (p != null) {
+                _post(p);
+                _nodesReady = true;
               }
             }).toJS,
           );
@@ -120,13 +124,27 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
   void dispose() {
     ResonanceController.routeObserver.unsubscribe(this);
     ResonanceController.unregisterFocus();
+    ResonanceController.unregisterScopeChanger();
     _pollSub?.cancel();
     _firestoreSub?.cancel();
     super.dispose();
   }
 
+  void _changePollScope(String? pollId) {
+    _pollSub?.cancel();
+    _pollSub = null;
+    _firestoreSub?.cancel();
+    _firestoreSub = null;
+    _currentPollId = null;
+    _pendingPayload = null;
+    _focusFired = false;
+    _nodesReady = false;
+    _runtimePollId = pollId;
+    _startSubscription();
+  }
+
   void _startSubscription() {
-    final providedPollId = widget.pollId;
+    final providedPollId = _runtimePollId ?? widget.pollId;
     if (providedPollId != null) {
       _currentPollId = providedPollId;
       _firestoreSub = FirebaseFirestore.instance
@@ -237,16 +255,18 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
     List<Map<String, dynamic>> nodes,
     List<Map<String, dynamic>> edges,
   ) {
-    final payload = jsonEncode({'nodes': nodes, 'edges': edges});
+    final tag = (!_focusFired) ? _pendingFocusTag : null;
+    final data = <String, dynamic>{'nodes': nodes, 'edges': edges};
+    if (tag != null) {
+      data['focus'] = tag;
+      _focusFired = true;
+      _pendingFocusTag = null;
+    }
+    final payload = jsonEncode(data);
     _pendingPayload = payload;
-    _post(payload);
-    // If iframe is already loaded, fire focus now (data → nodes created synchronously in JS).
-    final tag = _pendingFocusTag;
-    if (tag != null && !_focusFired && _iframeLoaded) {
-      Future.delayed(
-        const Duration(milliseconds: 600),
-        () => _triggerFocus(tag),
-      );
+    if (_iframeLoaded) {
+      _post(payload);
+      _nodesReady = true;
     }
   }
 
@@ -257,12 +277,6 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
     cw.postMessage(payload.toJS, '*'.toJS);
   }
 
-  static void _triggerFocus(String tag) {
-    if (_focusFired) return;
-    _focusFired = true;
-    _pendingFocusTag = null;
-    _post(jsonEncode({'focus': tag}));
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -339,30 +353,6 @@ class _ResonanceWebScreenState extends State<ResonanceWebScreen> with RouteAware
               ),
             ),
           ),
-          if (widget.showBackButton)
-            Positioned(
-              top: 0,
-              left: 0,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 16, left: 16),
-                  child: TextButton(
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(44, 44),
-                      padding: EdgeInsets.zero,
-                      backgroundColor: Colors.black.withValues(alpha: 0.4),
-                      shape: const CircleBorder(),
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white,
-                      size: 18,
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

@@ -5,6 +5,26 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-15] — Fix: Resonance camera focus race conditions; brain visualiser node stability; web app icon
+
+### Resonance focus — race condition fix (native + web)
+- **Root cause:** `focusOnNode` was fired as a separate `runJavaScript`/`postMessage` call before nodes were built in JS, so `nodesByName.get(tag)` always returned `undefined` and the tween silently no-opped.
+- **Native (`resonance_native_screen.dart`):** `_focusNode` now always stores tag as `_pendingFocusTag`; fires immediately only when `_pendingJson != null` (nodes confirmed built). `_inject` accepts optional `focusTag` and embeds it in the JSON payload so `processBrainData` calls `focusOnNode` **after** nodes are populated in the same synchronous call.
+- **Web (`resonance_web_screen.dart`):** Added `_nodesReady` static flag (reset on every `_changePollScope`, set after first successful `_post`). Focus callback now gates on `_nodesReady` rather than `_pendingPayload != null` — preventing stale-payload false positives across question changes. `_sendDataToBrain` embeds focus in the payload. Removed `_triggerFocus` + 600ms `Future.delayed` hack.
+- **`resonance_controller.dart`:** No logic change — ordering was correct; fix was in the screens.
+
+### brain_visualizer.html — node stability + region label colours
+- **Node stability fix:** replaced blanket `clearNodes()` before every data update with a selective removal loop that only tears down nodes absent from the incoming payload. Existing nodes now update in place (scale + emissive flash) rather than being re-created with a new random position each Firestore tick.
+- **`processBrainData` focus ordering:** pure-focus messages (`{focus}` only) still early-return; combined payloads (`{nodes, focus}`) now call `focusOnNode` at the end, after nodes are built.
+- **Region label colours:** `makeRegionSprite` now calls `regionLabelColor()` — Amygdala→red-pink, Nucleus→gold, Insula→teal, Prefrontal→violet — matching the node geometry palette.
+
+### Web app icon
+- All four PWA manifest icons (`icons/Icon-{192,512,maskable-192,maskable-512}.png`) regenerated from `stew_iconn.png` (were still Flutter default blue).
+- `favicon.png` replaced with correctly-sized 32×32 version; `apple-touch-icon.png` generated at 180×180.
+- `index.html` updated to reference sized icons. `manifest.json` theme/background colours updated from Flutter default blue to `#030420`.
+
+---
+
 ## [2026-05-15] — Feat: pollId deep-link from feed chips; back-button fixes; debug print cleanup
 
 ### Feed chip → Resonance deep-link

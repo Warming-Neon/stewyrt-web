@@ -12,17 +12,14 @@ class ResonanceScreen extends StatelessWidget {
     super.key,
     this.pollId,
     this.initialFocusTag,
-    this.showBackButton = false,
   });
 
   final String? pollId;
   final String? initialFocusTag;
-  final bool showBackButton;
 
   @override
   Widget build(BuildContext context) => ResonancePlatformScreen(
-        pollId:         pollId,
+        pollId:          pollId,
         initialFocusTag: initialFocusTag,
-        showBackButton:  showBackButton,
       );
 }

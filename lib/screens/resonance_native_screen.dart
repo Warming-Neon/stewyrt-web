@@ -13,12 +13,10 @@ class ResonancePlatformScreen extends StatefulWidget {
     super.key,
     this.pollId,
     this.initialFocusTag,
-    this.showBackButton = false,
   });
 
   final String? pollId;
   final String? initialFocusTag;
-  final bool showBackButton;
 
   @override
   State<ResonancePlatformScreen> createState() => _ResonanceNativeScreenState();
@@ -35,11 +33,13 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
   StreamSubscription? _pollSub;
   StreamSubscription? _firestoreSub;
   String? _currentPollId;
+  String? _runtimePollId;
 
   @override
   void initState() {
     super.initState();
     ResonanceController.registerFocus(_focusNode);
+    ResonanceController.registerScopeChanger(_changePollScope);
     if (widget.initialFocusTag != null) _pendingFocusTag = widget.initialFocusTag;
 
     _controller = WebViewController()
@@ -51,10 +51,14 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
           if (msg.message != 'ready' || !mounted) return;
           _pageLoaded = true;
           final pending = _pendingJson;
-          if (pending != null) _inject(pending);
           final tag = _pendingFocusTag;
-          if (tag != null) {
-            _pendingFocusTag = null;
+          if (tag != null) _pendingFocusTag = null;
+          // Embed focus in the data payload so JS focusOnNode runs after
+          // nodes are built in the same processBrainData call, not in a
+          // separate runJavaScript that may execute before nodes exist.
+          if (pending != null) {
+            _inject(pending, focusTag: tag);
+          } else if (tag != null) {
             _focusNode(tag);
           }
         },
@@ -67,7 +71,45 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
       ..setBackgroundColor(Colors.black)
       ..loadFlutterAsset('web/brain_visualizer.html');
 
-    final providedPollId = widget.pollId;
+    _startSubscription();
+  }
+
+  @override
+  void dispose() {
+    ResonanceController.unregisterFocus();
+    ResonanceController.unregisterScopeChanger();
+    _pollSub?.cancel();
+    _firestoreSub?.cancel();
+    super.dispose();
+  }
+
+  void _focusNode(String tag) {
+    // Always store as pending — if nodes aren't built yet (page just loaded,
+    // or poll scope just changed), _processSnapshot will embed it in the next
+    // inject. If nodes already exist, fire immediately too.
+    _pendingFocusTag = tag;
+    if (_pageLoaded && _pendingJson != null) {
+      // Nodes exist — fire now and clear pending.
+      _pendingFocusTag = null;
+      _controller.runJavaScript(
+        "if (typeof focusOnNode === 'function') { focusOnNode(${jsonEncode(tag)}); }",
+      );
+    }
+  }
+
+  void _changePollScope(String? pollId) {
+    _pollSub?.cancel();
+    _pollSub = null;
+    _firestoreSub?.cancel();
+    _firestoreSub = null;
+    _currentPollId = null;
+    _pendingJson = null;
+    _runtimePollId = pollId;
+    _startSubscription();
+  }
+
+  void _startSubscription() {
+    final providedPollId = _runtimePollId ?? widget.pollId;
     if (providedPollId != null) {
       _currentPollId = providedPollId;
       _firestoreSub = FirebaseFirestore.instance
@@ -100,24 +142,6 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
             .snapshots()
             .listen(_processSnapshot);
       });
-    }
-  }
-
-  @override
-  void dispose() {
-    ResonanceController.unregisterFocus();
-    _pollSub?.cancel();
-    _firestoreSub?.cancel();
-    super.dispose();
-  }
-
-  void _focusNode(String tag) {
-    if (_pageLoaded) {
-      _controller.runJavaScript(
-        "if (typeof focusOnNode === 'function') { focusOnNode(${jsonEncode(tag)}); }",
-      );
-    } else {
-      _pendingFocusTag = tag;
     }
   }
 
@@ -185,15 +209,25 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
 
     final jsonString = jsonEncode({'nodes': nodes, 'edges': edges});
     _pendingJson = jsonString;
-    if (_pageLoaded) _inject(jsonString);
+    if (_pageLoaded) {
+      final tag = _pendingFocusTag;
+      if (tag != null) _pendingFocusTag = null;
+      _inject(jsonString, focusTag: tag);
+    }
   }
 
-  void _inject(String jsonString) {
-    // jsonEncode(jsonString) wraps the JSON string in a properly escaped JS
-    // string literal, so single quotes in emotion words cannot break the call.
+  void _inject(String jsonString, {String? focusTag}) {
+    // Embed focusTag in the payload so JS focusOnNode fires after nodes are
+    // built in the same processBrainData call, avoiding the async-ordering race.
+    String payloadString = jsonString;
+    if (focusTag != null) {
+      final map = jsonDecode(jsonString) as Map<String, dynamic>;
+      map['focus'] = focusTag;
+      payloadString = jsonEncode(map);
+    }
     _controller.runJavaScript(
       "if (typeof updateBrainDataNative === 'function') {"
-      "updateBrainDataNative(${jsonEncode(jsonString)});"
+      "updateBrainDataNative(${jsonEncode(payloadString)});"
       "}",
     );
   }
@@ -268,36 +302,6 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
               ),
             ),
           ),
-          if (widget.showBackButton)
-            Positioned(
-              top: 0,
-              left: 0,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 16, left: 16),
-                  child: GestureDetector(
-                    onTap: () {
-                      if (Navigator.of(context).canPop()) {
-                        Navigator.of(context).pop();
-                      }
-                    },
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.4),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 18,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );

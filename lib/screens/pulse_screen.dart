@@ -2,10 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/resonance_controller.dart';
 import '../widgets/poll_card.dart';
 import '../widgets/recording_sheet.dart';
 import '../widgets/sentiment_stream.dart';
-import 'resonance_screen.dart';
 
 // ── Firestore poll model ──────────────────────────────────────────────────────
 
@@ -145,14 +145,7 @@ class _PulseScreenState extends State<PulseScreen> {
   // ── Navigation ────────────────────────────────────────────────────────────
 
   void _viewResonance(String pollId) {
-    Navigator.of(context).push(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 400),
-        pageBuilder: (_, _, _) => ResonanceScreen(pollId: pollId, showBackButton: true),
-        transitionsBuilder: (_, anim, _, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-    );
+    ResonanceController.goToResonanceTab(pollId: pollId);
   }
 
   void _openRecording(String question, String pollId) {

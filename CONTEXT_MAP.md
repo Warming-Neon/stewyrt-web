@@ -628,23 +628,22 @@ All platforms render The Resonance using `web/brain_visualizer.html` — a self-
 - `_iframe` — direct reference to the `HTMLIFrameElement`
 - `_pendingPayload` — last serialised JSON; replayed on iframe `'load'` event
 - `_pendingFocusTag` / `_iframeLoaded` / `_focusFired` — focus delivery coordination
+- `_nodesReady` — set `true` only after the first payload for the current poll scope is posted; reset to `false` on every `_changePollScope`. Guards the registered-focus callback so it never fires against nodes from a previous question.
+
+**Focus delivery:** focus tag is embedded in the data payload (`{'nodes':…, 'edges':…, 'focus': tag}`) so `processBrainData` in JS calls `focusOnNode` **after** nodes are built in the same call. A separate postMessage for focus is only sent when `_nodesReady` is already true (nodes from current scope confirmed built).
 
 **Timing:** Firestore resolves in <1s; Three.js CDN loads in 2–5s. The `'load'` event on the iframe replays `_pendingPayload` so nodes always appear even when Firestore wins the race.
 
 ### Native Screen Key Details
 
 - `_pageLoaded` is set **only** when `BrainChannel.postMessage('ready')` fires from JS — not on `onPageFinished`, which fires before Three.js CDN imports complete.
-- `_pendingJson` and `_pendingFocusTag` buffer data that arrives before the page is ready.
-- `setOnConsoleMessage` mirrors all `[BRAIN]` console logs to Flutter's debug console.
-- `addJavaScriptChannel('BrainChannel', ...)` must be registered **before** `loadFlutterAsset`.
+- `_pendingFocusTag` stores the focus tag regardless of page-load state. `_inject` accepts optional `focusTag` and embeds it in the payload so JS focus fires after nodes exist.
+- `_focusNode` fires immediately (separate `runJavaScript`) only when `_pendingJson != null`, meaning nodes are already built for the current scope.
+- `_processSnapshot` always passes `_pendingFocusTag` to `_inject` on the first snapshot after a scope change, then clears it.
 
 ```dart
-void _inject(String jsonString) {
-  _controller.runJavaScript(
-    "if (typeof updateBrainDataNative === 'function') {"
-    "updateBrainDataNative(${jsonEncode(jsonString)});"
-    "}",
-  );
+void _inject(String jsonString, {String? focusTag}) {
+  // focusTag embedded in payload → JS focusOnNode fires after nodes built
 }
 ```
 

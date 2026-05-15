@@ -11,8 +11,8 @@ import 'package:record/record.dart';
 import 'package:uuid/uuid.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../screens/resonance_screen.dart';
 import '../services/phrase_service.dart';
+import '../services/resonance_controller.dart';
 import '../services/auth_service.dart';
 import '../widgets/mic_permission_banner.dart';
 import '../services/firestore_service.dart';
@@ -412,17 +412,8 @@ class _RecordingSheetState extends State<RecordingSheet>
 
   void _onTagTap(String tag) {
     HapticFeedback.lightImpact();
-    final nav = Navigator.of(context);
-    nav.pop();
-    nav.push(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 400),
-        pageBuilder: (_, _, _) =>
-            ResonanceScreen(pollId: widget.pollId, initialFocusTag: tag, showBackButton: true),
-        transitionsBuilder: (_, anim, _, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-    );
+    Navigator.of(context).pop();
+    ResonanceController.goToResonanceAndFocus(tag, pollId: widget.pollId);
   }
 
   void _startResultAnimation() {

@@ -28,6 +28,22 @@
       white-space: nowrap;
       text-align: center;
     }
+    #back-button {
+      display: none;
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.4);
+      border: none;
+      cursor: pointer;
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
   </style>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
@@ -36,6 +52,11 @@
 <div id="canvas-container">
   <div id="tooltip"><span id="tt-pct"></span></div>
 </div>
+<button id="back-button">
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11 4L6 9L11 14" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+</button>
 
 <script type="importmap">
 {
@@ -222,12 +243,21 @@ addBrainLine([V3(-3, 9, 2), V3(0, 9.5, 0), V3(3, 9, 2)], 0.22);
 addBrainLine([V3(-3, -5, -9), V3(0, -7, -11), V3(3, -5, -9)], 0.28);
 
 // ─── Region zone labels (Sprites, always face camera) ────────────────────────
+function regionLabelColor(text) {
+  switch (text) {
+    case 'Amygdala':  return '#e05a6a'; // red-pink, matches regionColor hue 0.95–1.08
+    case 'Nucleus':   return '#d4a030'; // gold,     matches regionColor hue 0.12–0.28
+    case 'Insula':    return '#40c9a0'; // teal,     matches regionColor hue 0.48–0.58
+    default:          return '#9b6fff'; // violet,   matches Prefrontal hue 0.70–0.82
+  }
+}
+
 function makeRegionSprite(text) {
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 64;
   const ctx = canvas.getContext('2d');
   ctx.font = 'bold 22px "Space Grotesk", sans-serif';
-  ctx.fillStyle = '#6a4aff';
+  ctx.fillStyle = regionLabelColor(text);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, 128, 32);
@@ -474,12 +504,47 @@ renderer.domElement.addEventListener('pointerup', e => {
   hideTooltip();
 });
 
+// ─── Remove all dynamic nodes from the scene ─────────────────────────────────
+function clearNodes() {
+  nodesByName.forEach(em => {
+    scene.remove(em._group);
+    em._core.geometry.dispose();
+    em._core.material.dispose();
+    em._mesh.geometry.dispose();
+    em._mesh.material.dispose();
+    scene.remove(em._label);
+    em._label.material.map.dispose();
+    em._label.material.dispose();
+  });
+  nodeMeshes.length = 0;
+  nodeDataMap.clear();
+  nodesByName.clear();
+}
+
 // ─── Core data processor ──────────────────────────────────────────────────────
 function processBrainData(data) {
   if (!data) { dbg('null data'); return; }
-  if (typeof data.focus === 'string') { dbg('focus: ' + data.focus); focusOnNode(data.focus); return; }
+  // Pure-focus message (no nodes): focus only, nodes must already exist.
+  if (typeof data.focus === 'string' && !Array.isArray(data.nodes)) { dbg('focus: ' + data.focus); focusOnNode(data.focus); return; }
   if (!Array.isArray(data.nodes)) { dbg('no nodes, keys=' + Object.keys(data).join(',')); return; }
   dbg(data.nodes.length + ' nodes, ' + (data.edges ? data.edges.length : 0) + ' edges');
+
+  // Remove only nodes absent from this update, preserving existing nodes in place
+  // so the update-in-place branch below (flash + scale) can actually fire.
+  const incomingNames = new Set(data.nodes.map(n => n.name).filter(Boolean));
+  nodesByName.forEach((em, name) => {
+    if (!incomingNames.has(name)) {
+      scene.remove(em._group);
+      em._core.geometry.dispose(); em._core.material.dispose();
+      em._mesh.geometry.dispose();  em._mesh.material.dispose();
+      scene.remove(em._label);
+      em._label.material.map.dispose(); em._label.material.dispose();
+      const idx = nodeMeshes.indexOf(em._mesh);
+      if (idx !== -1) nodeMeshes.splice(idx, 1);
+      nodeDataMap.delete(em._mesh.uuid);
+      nodesByName.delete(name);
+    }
+  });
 
   let newNodes = 0;
   data.nodes.forEach(({ name, percent, region }) => {
@@ -507,6 +572,9 @@ function processBrainData(data) {
       if (emA && emB) firePath(addPath(emA, emB, weight), now);
     });
   }
+
+  // Focus after nodes are built so nodesByName is populated.
+  if (typeof data.focus === 'string') { dbg('focus (post-nodes): ' + data.focus); focusOnNode(data.focus); }
 }
 
 // ─── Native bridge (Flutter WebView → runJavaScript) ─────────────────────────
@@ -518,9 +586,17 @@ window.updateBrainDataNative = function(jsonString) {
 };
 
 // ─── Web iframe bridge (Flutter web → postMessage) ───────────────────────────
+document.getElementById('back-button').addEventListener('click', () => {
+  window.parent.postMessage(JSON.stringify({ type: 'flutter_nav', action: 'pop' }), '*');
+});
+
 window.addEventListener('message', e => {
   let data;
   try { data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data; } catch { return; }
+  if (data.type === 'flutter_nav' && data.action === 'show_back') {
+    document.getElementById('back-button').style.display = 'flex';
+    return;
+  }
   processBrainData(data);
 });
 

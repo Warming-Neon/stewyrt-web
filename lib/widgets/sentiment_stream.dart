@@ -351,7 +351,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
       if (s.processingState == ProcessingState.completed) _onTrackCompleted();
     });
 
-    _loadAndPlay(_orderIndex);
+    _loadAndPlay(_orderIndex, play: false);
   }
 
   @override
@@ -363,7 +363,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
     super.dispose();
   }
 
-  Future<void> _loadAndPlay(int orderIdx) async {
+  Future<void> _loadAndPlay(int orderIdx, {bool play = true}) async {
     if (mounted) setState(() { _loadingUrl = true; _audioError = false; _position = Duration.zero; _duration = Duration.zero; });
     final item = widget.items[_order[orderIdx]];
 
@@ -377,7 +377,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
       final url = await FirebaseStorage.instance.ref(item.audioPath).getDownloadURL();
       debugPrint('[STEWYRT][PLAYER] Loading: ${item.audioPath}');
       await _player.setUrl(url);
-      _player.play(); // intentionally not awaited — play() resolves on completion, not on start
+      if (play) _player.play(); // intentionally not awaited — play() resolves on completion, not on start
     } catch (e) {
       debugPrint('[STEWYRT][PLAYER] Failed to load audio: $e');
       if (mounted) setState(() => _audioError = true);
