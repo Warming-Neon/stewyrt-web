@@ -94,15 +94,12 @@ class _RootShellState extends State<RootShell> {
   @override
   void initState() {
     super.initState();
-    ResonanceController.registerTabSwitcher(
-      (i) => setState(() => _selectedIndex = i),
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() => _selectedIndex = 1);
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        setState(() => _selectedIndex = 0);
-      });
-    });
+    ResonanceController.registerTabSwitcher(_selectTab);
+  }
+
+  void _selectTab(int i) {
+    if (_selectedIndex == 1 && i != 1) ResonanceController.stopSpin();
+    setState(() => _selectedIndex = i);
   }
 
   static final _screens = [
@@ -143,7 +140,7 @@ class _RootShellState extends State<RootShell> {
           selected: _selectedIndex == 0,
           textColor: textColor,
           subColor: subColor,
-          onTap: () => setState(() => _selectedIndex = 0),
+          onTap: () => _selectTab(0),
         ),
         const SizedBox(width: 24),
         _NavItem(
@@ -152,7 +149,7 @@ class _RootShellState extends State<RootShell> {
           selected: _selectedIndex == 1,
           textColor: textColor,
           subColor: subColor,
-          onTap: () => setState(() => _selectedIndex = 1),
+          onTap: () => _selectTab(1),
         ),
         const SizedBox(width: 24),
         _NavItem(
@@ -161,7 +158,7 @@ class _RootShellState extends State<RootShell> {
           selected: _selectedIndex == 2,
           textColor: textColor,
           subColor: subColor,
-          onTap: () => setState(() => _selectedIndex = 2),
+          onTap: () => _selectTab(2),
         ),
       ],
     );

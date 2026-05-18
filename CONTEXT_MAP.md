@@ -41,7 +41,7 @@ stewyrt/
 │   ├── widgets/
 │   │   ├── recording_sheet.dart          — Record / preview / submit bottom sheet; soft-block + human-review request; mic-denied banner
 │   │   ├── sentiment_stream.dart         — Live response feed scoped to current pollId; long-press report flow (_ReportSheet)
-│   │   ├── poll_card.dart                — Poll question card (tier label, nullable onTap for placeholder slots)
+│   │   ├── poll_card.dart                — Poll question card (tier label, text scaling via FittedBox, nullable onTap for placeholder slots)
 │   │   └── mic_permission_banner.dart    — Amber banner shown when mic permission denied; taps openAppSettings()
 │   │
 │   ├── services/
@@ -50,10 +50,10 @@ stewyrt/
 │   │   ├── phrase_service.dart           — Singleton; prefetches waiting_phrases from Firestore; generateStory() picks 4 random acts
 │   │   ├── upload_bytes_io.dart          — Native impl: File.readAsBytes()
 │   │   ├── upload_bytes_web.dart         — Web impl: fetch() + arrayBuffer() via dart:js_interop
-│   │   ├── auth_service.dart             — signInAnonymously()
-│   │   └── resonance_controller.dart     — Static coordinator: tab switching, focus callbacks, and pollId deep-link push (goToResonanceAndFocus)
-│   │
-│   ├── theme/
+│   ├── auth_service.dart             — signInAnonymously()
+│   └── resonance_controller.dart     — Static coordinator: tab switching, focus callbacks, auto-spin control, and pollId deep-link push (goToResonanceAndFocus)
+│
+├── theme/
 │   │   ├── app_theme.dart                — Light/dark ThemeData, Space Grotesk text theme
 │   │   └── theme_notifier.dart           — ChangeNotifier toggle for dark/light mode
 │   │
@@ -62,7 +62,7 @@ stewyrt/
 │
 ├── web/
 │   ├── brain_visualizer.html             — Self-contained Three.js 3D brain (The Resonance)
-│   ├── privacy.html                      — Privacy & Ethical Usage Policy (GDPR/UK PECR compliant)
+│   ├── privacy.html                      — Privacy & Ethical Usage Policy (GDPR/UK PECR compliant, ICO ZC142846)
 │   ├── terms.html                        — Terms of Service (England & Wales, 18+ gate)
 │   ├── index.html                        — Flutter web bootstrap (generated)
 │   ├── manifest.json                     — PWA manifest (generated)
@@ -88,8 +88,49 @@ stewyrt/
 ├── firestore.indexes.json                 — Composite indexes for blocked-filter, poll-rotation, and schedule queries
 ├── pubspec.yaml
 ├── analysis_options.yaml
+├── geminiignore                           — Excludes sensitive paths from Gemini context
 └── firebase.json
+
+---
+
+## Android Release Signing
+
+The Android app is configured for release signing via `key.properties`. This file is **excluded from git** and must be present locally in the `android/` directory for release builds.
+
+### `android/key.properties` (Local Only)
+```properties
+storePassword=...
+keyPassword=...
+keyAlias=stewyrt
+storeFile=/Users/terrymccall/stewyrt-release.jks
 ```
+
+### Gradle Configuration (`android/app/build.gradle.kts`)
+Loads the properties file and creates a `release` signing configuration:
+```kotlin
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.projectDir.resolve("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+
+signingConfigs {
+    create("release") {
+        keyAlias = keystoreProperties["keyAlias"]?.toString()
+        keyPassword = keystoreProperties["keyPassword"]?.toString()
+        storeFile = keystoreProperties["storeFile"]?.toString()?.let { file(it) }
+        storePassword = keystoreProperties["storePassword"]?.toString()
+    }
+}
+
+buildTypes {
+    release {
+        signingConfig = signingConfigs.getByName("release")
+    }
+}
+```
+
+---
 
 ---
 
@@ -846,3 +887,10 @@ final bg  = isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
 1. `audioPath` field
 2. `uuid` field → `audio_uploads/<uuid>.m4a`
 3. Doc ID (36-char UUID) → `audio_uploads/<docId>.m4a`
+
+### Auto-Spin Screensaver
+
+Auto-rotation mode toggled via the floating action button (#spin-button).
+- **Speed:** 0.28 rad/s (~16°/s, full rotation ≈ 22s).
+- **Radius:** Dynamically calculated based on the node cluster's bounding sphere, ensuring the "brain" remains perfectly framed within the viewport (includes 18% safe margin).
+- **Control:** Tapping anywhere or programmatic focus (focusOnNode) cancels the spin. Programmable via stopSpin() bridge.

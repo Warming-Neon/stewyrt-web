@@ -8,6 +8,7 @@ class ResonanceController {
   static void Function(int)? _switchTab;
   static void Function(String)? _focus;
   static void Function(String?)? _scopePoll;
+  static void Function()? _stopSpin;
 
   static void registerTabSwitcher(void Function(int) fn) => _switchTab = fn;
 
@@ -16,6 +17,10 @@ class ResonanceController {
 
   static void registerScopeChanger(void Function(String?) fn) => _scopePoll = fn;
   static void unregisterScopeChanger() => _scopePoll = null;
+
+  static void registerSpinStopper(void Function() fn) => _stopSpin = fn;
+  static void unregisterSpinStopper() => _stopSpin = null;
+  static void stopSpin() => _stopSpin?.call();
 
   // Switch to the Resonance tab, focus the named synapse, and optionally scope to a poll.
   static void goToResonanceAndFocus(String tag, {String? pollId}) {

@@ -1,0 +1,10 @@
+echo "node_modules
+.git
+build
+.dart_tool
+.pub-cache
+functions/node_modules
+ios/Pods
+android/.gradle
+.gradle
+*.lock" > .geminiignore

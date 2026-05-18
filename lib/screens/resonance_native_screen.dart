@@ -40,6 +40,7 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
     super.initState();
     ResonanceController.registerFocus(_focusNode);
     ResonanceController.registerScopeChanger(_changePollScope);
+    ResonanceController.registerSpinStopper(_stopSpin);
     if (widget.initialFocusTag != null) _pendingFocusTag = widget.initialFocusTag;
 
     _controller = WebViewController()
@@ -78,9 +79,15 @@ class _ResonanceNativeScreenState extends State<ResonancePlatformScreen> {
   void dispose() {
     ResonanceController.unregisterFocus();
     ResonanceController.unregisterScopeChanger();
+    ResonanceController.unregisterSpinStopper();
     _pollSub?.cancel();
     _firestoreSub?.cancel();
     super.dispose();
+  }
+
+  void _stopSpin() {
+    if (!_pageLoaded) return;
+    _controller.runJavaScript('stopSpin()');
   }
 
   void _focusNode(String tag) {

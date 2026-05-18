@@ -64,15 +64,21 @@ class PollCard extends StatelessWidget {
                   letterSpacing: 2,
                 ),
               ),
-              const Spacer(),
-              Text(
-                question,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.spaceGrotesk(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  color: textColor,
-                  height: 1.3,
+              Expanded(
+                child: Center(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      question,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        color: textColor,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               if (onTap != null) ...[

@@ -5,6 +5,28 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-18] — Security: Android release signing; Privacy compliance; Site rebuild
+
+### Android Release Signing
+- **`android/app/build.gradle.kts`**: Configured release signing to load credentials from `key.properties`. Updated build configuration to use `release` signing config instead of debug.
+- **`android/key.properties`**: (Local only) Added release keystore path and passwords.
+- **`android/.gitignore`**: Ensured `key.properties` is explicitly ignored.
+
+### Compliance & Security
+- **`web/privacy.html`**: Added "How to Delete Your Data" section to comply with app store requirements.
+- **`.geminiignore`**: Added project-level ignore file to exclude sensitive paths (e.g., `.git`, `functions/node_modules`) from Gemini analysis.
+
+### Resonance auto-spin screensaver
+- **`web/brain_visualizer.html`**: Added auto-rotation mode via `#spin-button`. Rebuilt warmingneon.com integration. Calculates a dynamic orbit radius based on the node cluster's bounding sphere to ensure the "brain" remains perfectly framed. Any user interaction (tap/drag) cancels the spin.
+- **`lib/services/resonance_controller.dart`**: Added `stopSpin()` / `registerSpinStopper()` coordination.
+- **`lib/main.dart`**: `RootShell` calls `stopSpin()` when switching tabs away from The Resonance.
+
+### UI & Compliance
+- **`lib/widgets/poll_card.dart`**: Question text now uses `FittedBox` + `Center` + `Expanded` to prevent layout overflow on long questions.
+- **`web/privacy.html`**: Updated ICO Registration Reference to `ZC142846`.
+
+---
+
 ## [2026-05-15] — Fix: Resonance camera focus race conditions; brain visualiser node stability; web app icon
 
 ### Resonance focus — race condition fix (native + web)
