@@ -225,7 +225,7 @@ class _DayOneScreenState extends State<DayOneScreen>
 
     debugPrint('[STEWYRT][DAY1] Quality check — duration: ${duration.inMilliseconds}ms, avg amplitude: ${avgAmp.toStringAsFixed(2)}dB');
 
-    if (duration.inMilliseconds < 2000 || avgAmp < -50.0) {
+    if (duration.inMilliseconds < 2000 || (kIsWeb ? avgAmp < 0.05 : avgAmp < -50.0)) {
       debugPrint('[STEWYRT][DAY1] ❌ Recording rejected — too short or silent');
       await _recorder.stop();
       await _resetRecorder();

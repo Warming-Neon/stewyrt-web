@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: correct web amplitude gate threshold for 0.0–1.0 compensated range
+
+### Flutter Client
+- **`lib/screens/day_one_screen.dart`**, **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**: Gate threshold is now platform-aware. On web, `avgAmp` is 0.0–1.0 from `SoftLimiter.webProcess()`, so the silent-recording check now uses `kIsWeb ? avgAmp < 0.05 : avgAmp < -50.0`. Previously comparing a 0.0–1.0 value against -50.0 meant the gate never fired on web, allowing silent recordings through.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
