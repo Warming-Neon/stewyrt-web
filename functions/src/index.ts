@@ -367,7 +367,11 @@ export const analyzeAudio = onObjectFinalized(
           createdAt:        admin.firestore.FieldValue.serverTimestamp(),
         };
 
-        // Store UID when derivable — used by the rate limiter on subsequent submissions.
+        // UID derivation: storage triggers have no auth context. UID is parsed
+        // from responseId when it is in production format ({uid}_{pollId}).
+        // In beta mode (UUID v4 responseId) UID is unavailable — no uid field
+        // is written. Beta-mode responses are excluded from GDPR erasure via
+        // deleteUserData; the 120-day audio purge is their only erasure path.
         if (rateUid) doc["uid"] = rateUid;
 
         tx.set(responseRef, doc);
