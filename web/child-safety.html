@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Child Safety Standards | Stewyrt</title>
+  <meta name="description" content="Stewyrt's child safety standards and CSAE prevention policy. How Warming Neon Ltd protects minors on the Stewyrt platform.">
+  <link rel="canonical" href="https://stewyrt.com/child-safety">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #0A0A0A;
+      --surface-2: #111111;
+      --text: #F5F5F5;
+      --muted: #AAAAAA;
+      --border: #1A1A1A;
+      --accent: #00e5c0;
+      --warning: #f0c040;
+      --danger: #ff4444;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 400;
+      line-height: 1.7;
+    }
+
+    nav {
+      padding: 1.25rem 4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.9);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-brand img { height: 28px; }
+
+    .nav-brand span {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    nav a.back {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+    }
+
+    nav a.back:hover { color: var(--text); }
+
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 4rem 2rem 6rem;
+    }
+
+    .page-header {
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .page-header .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(0,229,192,0.3);
+      padding: 0.3rem 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+
+    .page-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .toc h3 {
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .toc ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .toc ul a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+      transition: color 0.2s;
+    }
+
+    .toc ul a:hover { color: var(--accent); }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    section h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    section p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+    }
+
+    section p strong { color: var(--text); }
+
+    section ul {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0;
+    }
+
+    section ul li {
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 0.4rem 0 0.4rem 1.25rem;
+      position: relative;
+    }
+
+    section ul li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 0.8rem;
+    }
+
+    .callout {
+      border-left: 2px solid var(--accent);
+      background: rgba(0,229,192,0.04);
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .callout.warning {
+      border-color: var(--warning);
+      background: rgba(240,192,64,0.04);
+    }
+
+    .callout.danger {
+      border-color: var(--danger);
+      background: rgba(255,68,68,0.04);
+    }
+
+    .callout p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .callout strong { color: var(--text); }
+
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      margin-top: 1.5rem;
+    }
+
+    .contact-box .label {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .contact-box .value {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+    }
+
+    .contact-box a { color: var(--accent); text-decoration: none; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    footer p { font-size: 0.78rem; color: var(--muted); }
+
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      nav { padding: 1rem 1.25rem; }
+      main { padding: 2rem 1.25rem 4rem; }
+      footer { padding: 1.5rem 1.25rem; flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="nav-brand">
+      <img src="/assets/logo.svg" alt="Stewyrt">
+      <span>Stewyrt</span>
+    </a>
+    <a href="/" class="back">← Back to Stewyrt</a>
+  </nav>
+
+  <main>
+    <div class="page-header">
+      <div class="badge">Child Safety Policy</div>
+      <h1>Child Safety Standards</h1>
+      <p>Last updated: 18 May 2026 · Warming Neon Ltd · Registered in England & Wales · ICO: ZC142846</p>
+    </div>
+
+    <div class="toc">
+      <h3>Contents</h3>
+      <ul>
+        <li><a href="#commitment">1. Our Commitment</a></li>
+        <li><a href="#age-gate">2. Age Restrictions</a></li>
+        <li><a href="#moderation">3. Content Moderation</a></li>
+        <li><a href="#reporting">4. Reporting Mechanisms</a></li>
+        <li><a href="#response">5. How We Respond</a></li>
+        <li><a href="#authorities">6. Reporting to Authorities</a></li>
+        <li><a href="#contact">7. Designated Contact</a></li>
+      </ul>
+    </div>
+
+    <section id="commitment">
+      <h2>1. Our Commitment</h2>
+      <p>Warming Neon Ltd operates Stewyrt with a zero-tolerance policy toward child sexual abuse and exploitation (CSAE) and any content that endangers, exploits, or harms minors in any way.</p>
+      <p>Stewyrt is an anonymous audio sentiment platform. Users submit short voice recordings in response to rotating questions. All audio is processed by AI and subject to content moderation before any derived data is published to the platform.</p>
+      <div class="callout danger">
+        <p><strong>Zero Tolerance:</strong> Any content that sexualises, exploits, or endangers children will result in immediate removal, permanent account suspension, and referral to relevant law enforcement authorities.</p>
+      </div>
+    </section>
+
+    <section id="age-gate">
+      <h2>2. Age Restrictions</h2>
+      <p>Stewyrt is strictly for users aged <strong>18 years and older</strong>. This is enforced at onboarding:</p>
+      <ul>
+        <li>Users must self-report their age group during onboarding — users under 18 are not permitted to proceed</li>
+        <li>Users must explicitly consent to our Terms of Service and Privacy Policy, which state the 18+ requirement</li>
+        <li>Anonymous authentication means no verified identity — we rely on self-declaration and content moderation to enforce this boundary</li>
+        <li>Any user identified as a minor will have their session terminated and data deleted</li>
+      </ul>
+    </section>
+
+    <section id="moderation">
+      <h2>3. Content Moderation</h2>
+      <p>Every audio submission on Stewyrt passes through an automated content moderation pipeline before any derived sentiment data is published:</p>
+      <ul>
+        <li><strong>AI Moderation:</strong> All audio is analysed by Google Gemini AI, which includes content safety classification as part of the sentiment analysis pipeline</li>
+        <li><strong>Automatic Blocking:</strong> Content flagged as violating our policies is automatically blocked and never published to the platform</li>
+        <li><strong>Audio Retention:</strong> Voice recordings are retained for a maximum of 120 days then automatically purged — onboarding verification audio is deleted immediately after processing</li>
+        <li><strong>No raw audio sharing:</strong> Raw audio files are never exposed to other users — only derived sentiment classifications (emotion words and brain region mappings) are published</li>
+        <li><strong>Firestore Security Rules:</strong> All published data is locked behind server-side security rules — clients cannot write directly to the database</li>
+      </ul>
+    </section>
+
+    <section id="reporting">
+      <h2>4. In-App Reporting Mechanisms</h2>
+      <p>Stewyrt provides users with mechanisms to report content they believe violates our policies:</p>
+      <ul>
+        <li><strong>Long-press to report:</strong> Any response visible in the live feed can be reported by long-pressing it</li>
+        <li><strong>Report categories:</strong> Users can report for harassment, hate speech, spam, misinformation, or other violations</li>
+        <li><strong>Rate limiting:</strong> Report submissions are rate-limited to prevent abuse of the reporting system</li>
+        <li><strong>Moderation review queue:</strong> All reports are logged to a secure moderation collection accessible only by Warming Neon Ltd administrators</li>
+      </ul>
+      <div class="callout">
+        <p><strong>To report a child safety concern directly:</strong> Email <a href="mailto:hello@warmingneon.com">hello@warmingneon.com</a> with the subject line "Child Safety Report". We aim to respond within 24 hours.</p>
+      </div>
+    </section>
+
+    <section id="response">
+      <h2>5. How We Respond to Reports</h2>
+      <p>Upon receiving a child safety report — whether in-app or via email — Warming Neon Ltd will:</p>
+      <ul>
+        <li>Acknowledge receipt within 24 hours</li>
+        <li>Immediately review the reported content</li>
+        <li>Remove any content that violates our child safety standards</li>
+        <li>Permanently suspend the associated anonymous session</li>
+        <li>Preserve any evidence that may be required by law enforcement</li>
+        <li>Report to relevant authorities where legally required (see Section 6)</li>
+      </ul>
+    </section>
+
+    <section id="authorities">
+      <h2>6. Reporting to Authorities</h2>
+      <p>Warming Neon Ltd complies with all applicable UK and international laws regarding the mandatory reporting of child sexual abuse material (CSAM) and child exploitation.</p>
+      <ul>
+        <li><strong>UK:</strong> Reports made to the <a href="https://www.iwf.org.uk" style="color: var(--accent);">Internet Watch Foundation (IWF)</a> and the <a href="https://www.nationalcrimeagency.gov.uk" style="color: var(--accent);">National Crime Agency (NCA)</a></li>
+        <li><strong>International:</strong> Reports made to the <a href="https://www.missingkids.org" style="color: var(--accent);">National Center for Missing & Exploited Children (NCMEC)</a> CyberTipline where applicable</li>
+        <li><strong>Law enforcement cooperation:</strong> We will fully cooperate with law enforcement investigations and comply with all lawful requests for information</li>
+      </ul>
+      <div class="callout warning">
+        <p><strong>Legal obligation:</strong> Under the Online Safety Act 2023 and applicable UK law, we are legally required to report known CSAM to the relevant authorities. We take this obligation seriously.</p>
+      </div>
+    </section>
+
+    <section id="contact">
+      <h2>7. Designated Contact</h2>
+      <p>The following contact is designated to speak about Stewyrt's child safety practices, CSAM prevention, and compliance with applicable laws:</p>
+      <div class="contact-box">
+        <div class="label">Designated Contact</div>
+        <div class="value">Terry McCall — Founder, Warming Neon Ltd</div>
+        <div class="label">Email</div>
+        <div class="value"><a href="mailto:hello@warmingneon.com">hello@warmingneon.com</a></div>
+        <div class="label">Company</div>
+        <div class="value">Warming Neon Ltd · Registered in England & Wales · Companies House: 16891563</div>
+        <div class="label">ICO Registration</div>
+        <div class="value">ZC142846</div>
+        <div class="label">Response Time</div>
+        <div class="value">Within 24 hours for child safety matters</div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Warming Neon Ltd. All rights reserved.</p>
+    <p>
+      <a href="/privacy.html">Privacy Policy</a> &nbsp;·&nbsp;
+      <a href="/terms.html">Terms of Service</a> &nbsp;·&nbsp;
+      <a href="mailto:hello@warmingneon.com">Contact</a>
+    </p>
+  </footer>
+
+</body>
+</html>

@@ -5,6 +5,21 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Feat: Child Safety Policy link; Firebase Hosting static rewrites
+
+- **`lib/screens/settings_screen.dart`**: Added "Child Safety Policy" link to the LEGAL section, pointing to `https://stewyrt.com/child-safety.html`.
+- **`firebase.json`**: Added static rewrites for `/privacy`, `/terms`, and `/child-safety` to serve their respective HTML files directly, bypassing the Flutter index.html.
+- **Verification**: Confirmed `web/privacy.html`, `web/terms.html`, and `web/child-safety.html` exist in the project.
+
+---
+
+## [2026-05-25] — Docs: Updated CONTEXT_MAP.md for codebase parity; bumped version
+
+- **`CONTEXT_MAP.md`**: Updated the project file map to include missing files (`verification_timeout_widget.dart` and `child-safety.html`) ensuring the map reflects the actual state of the codebase.
+- **`pubspec.yaml`**: Bumped version to `1.0.1+2`.
+
+---
+
 ## [2026-05-18] — Security: Android release signing; Privacy compliance; Site rebuild
 
 ### Android Release Signing

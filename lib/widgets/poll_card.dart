@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:auto_size_text/auto_size_text.dart';
 
 class PollCard extends StatelessWidget {
   final String question;
@@ -53,6 +54,7 @@ class PollCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(
+            mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Text(
@@ -65,71 +67,87 @@ class PollCard extends StatelessWidget {
                 ),
               ),
               Expanded(
+                flex: 1,
                 child: Center(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      question,
-                      textAlign: TextAlign.center,
-                      style: GoogleFonts.spaceGrotesk(
-                        fontSize: 26,
-                        fontWeight: FontWeight.w700,
-                        color: textColor,
-                        height: 1.3,
-                      ),
+                  child: AutoSizeText(
+                    question,
+                    textAlign: TextAlign.center,
+                    maxLines: 10,
+                    minFontSize: 12,
+                    maxFontSize: 28,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: textColor,
+                      height: 1.3,
                     ),
                   ),
                 ),
               ),
-              if (onTap != null) ...[
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: border),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Press to respond',
-                    style: GoogleFonts.spaceGrotesk(
-                      fontSize: 12,
-                      color: subColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-              if (onViewResonance != null) ...[
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onViewResonance!();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: border.withValues(alpha: 0.6)),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.blur_on_rounded, size: 13, color: subColor),
-                        const SizedBox(width: 6),
-                        Text(
-                          'View The Resonance',
-                          style: GoogleFonts.spaceGrotesk(
-                            fontSize: 11,
-                            color: subColor,
-                            fontWeight: FontWeight.w500,
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onTap != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: border),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.chat_bubble_outline_rounded, size: 14, color: subColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Press to respond',
+                              style: GoogleFonts.spaceGrotesk(
+                                fontSize: 12,
+                                color: subColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    if (onViewResonance != null) ...[
+                      const SizedBox(height: 10),
+                      GestureDetector(
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          onViewResonance!();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: border.withValues(alpha: 0.6)),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.blur_on_rounded, size: 13, color: subColor),
+                              const SizedBox(width: 6),
+                              Text(
+                                'View The Resonance',
+                                style: GoogleFonts.spaceGrotesk(
+                                  fontSize: 11,
+                                  color: subColor,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    ],
+                  ],
                 ),
-              ],
+              ),
             ],
           ),
         ),

@@ -188,6 +188,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   fg: fg, sub: sub, border: border,
                   onTap: () => _openUrl('https://stewyrt.com/privacy.html'),
                 ),
+                _TapRow(
+                  label: 'Child Safety Policy',
+                  fg: fg, sub: sub, border: border,
+                  onTap: () => _openUrl('https://stewyrt.com/child-safety.html'),
+                ),
                 _SectionHeader('SUPPORT', sub),
                 _TapRow(
                   label: 'Contact Support',

@@ -17,7 +17,9 @@ class MicPermissionBanner extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: const Color(0xFFFFB74D).withValues(alpha: 0.10),
-          border: Border.all(color: const Color(0xFFFFB74D).withValues(alpha: 0.4)),
+          border: Border.all(
+            color: const Color(0xFFFFB74D).withValues(alpha: 0.4),
+          ),
           borderRadius: BorderRadius.circular(4),
         ),
         child: Row(

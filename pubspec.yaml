@@ -2,7 +2,7 @@ name: stewyrt
 description: "An anonymous, audio-only social sentiment platform."
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: ^3.11.1
@@ -30,6 +30,7 @@ dependencies:
     sdk: flutter
   permission_handler: ^11.0.0
   package_info_plus: ^4.0.0
+  auto_size_text: ^3.0.0
 
 dev_dependencies:
   flutter_test:
