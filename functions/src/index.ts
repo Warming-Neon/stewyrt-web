@@ -104,7 +104,7 @@ export const analyzeAudio = onObjectFinalized(
         }
       }
 
-      if (attemptCount >= 5) {
+      if (attemptCount >= 3) {
         console.warn(`[STEWYRT] Verification rate limit hit for uid: ${uuid}`);
         if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
         await storageBucket.file(filePath).delete();
@@ -213,30 +213,40 @@ export const analyzeAudio = onObjectFinalized(
       // 1.5 — Rate limiting: attempt to derive UID from available signals.
       // "owner" metadata is not currently set by the client. In production mode,
       // responseId = {uid}_{pollId}, from which the UID can be extracted.
-      // Falls back to null in beta mode (UUID v4 responseId) — rate limiting is skipped.
-      const rateUid = extractUidForRateLimit(rawResponseId);
+      // In beta mode, we now derive the UID from the Firebase Auth context.
+      const rateUid = extractUidForRateLimit(rawResponseId) || (event as any).auth?.uid;
 
-      if (rateUid) {
-        const oneHourAgo = admin.firestore.Timestamp.fromDate(
-          new Date(Date.now() - 60 * 60 * 1000),
-        );
-        const countSnap = await db
-          .collection("responses")
-          .where("uid", "==", rateUid)
-          .where("createdAt", ">", oneHourAgo)
-          .count()
-          .get();
-        if (countSnap.data().count >= 30) {
-          console.warn(`[STEWYRT] Rate limit hit for uid: ${rateUid}`);
-          if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-          await db.collection("responses").doc(trustedResponseId).set({
-            blocked:       true,
-            blockedReason: "rate_limit",
-            uid:           rateUid,
-            createdAt:     admin.firestore.FieldValue.serverTimestamp(),
-          });
-          return;
-        }
+      if (!rateUid) {
+        console.warn("[STEWYRT] No auth context available — blocking submission");
+        if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+        await db.collection("responses").doc(trustedResponseId).set({
+          blocked:       true,
+          blockedReason: "unauthenticated",
+          createdAt:     admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return;
+      }
+
+      const oneHourAgo = admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() - 60 * 60 * 1000),
+      );
+      const countSnap = await db
+        .collection("responses")
+        .where("uid", "==", rateUid)
+        .where("createdAt", ">", oneHourAgo)
+        .count()
+        .get();
+
+      if (countSnap.data().count >= 5) {
+        console.warn(`[STEWYRT] Rate limit hit for uid: ${rateUid}`);
+        if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+        await db.collection("responses").doc(trustedResponseId).set({
+          blocked:       true,
+          blockedReason: "rate_limit",
+          uid:           rateUid,
+          createdAt:     admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return;
       }
 
       // 1.2 — Validate pollId: confirm the referenced poll document exists

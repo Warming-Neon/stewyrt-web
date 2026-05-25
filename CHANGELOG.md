@@ -5,6 +5,15 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: Tighten rate limits, fix verification inconsistency, enforce beta mode rate limiting
+
+### Cloud Functions (`functions/src/index.ts`)
+- **Sentiment Analysis Rate Limit**: Dropped threshold from 30 to 5 responses per rolling hour per user.
+- **Verification Rate Limit**: Fixed inconsistency where logic allowed 5 attempts while comments/UI specified 3; now strictly enforced at 3 attempts per 24 hours.
+- **Beta Mode Rate Limiting**: Previously skipped for UUID v4 response IDs (beta mode). Now derives UID from Firebase Auth context (`event.auth.uid`) to apply the same 5-per-hour limit. Submissions without a valid auth context are now blocked entirely.
+
+---
+
 ## [2026-05-25] — Feat: Daily question activation system
 
 ### Cloud Functions (`functions/src/index.ts`)
