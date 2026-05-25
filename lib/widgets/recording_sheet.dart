@@ -57,9 +57,11 @@ class _RecordingSheetState extends State<RecordingSheet>
 
   // Live waveform
   final List<double> _liveSamples = [];
+  final List<double> _rawAmplitudes = [];
   bool _pressActive = false; // tracks whether the pointer is still held down
 
   // Recording clock + 30-second hard cutoff
+  DateTime? _recordStartTime;
   Duration _recordDuration = Duration.zero;
   Timer? _clockTimer;
   Timer? _maxDurationTimer;
@@ -188,6 +190,9 @@ class _RecordingSheetState extends State<RecordingSheet>
     );
     debugPrint('[STEWYRT][RECORD] Recording started');
 
+    _recordStartTime = DateTime.now();
+    _rawAmplitudes.clear();
+
     // If the press was released while start() was awaiting, abort cleanly.
     if (!_pressActive) {
       debugPrint('[STEWYRT][RECORD] Press released before start completed — aborting');
@@ -204,6 +209,7 @@ class _RecordingSheetState extends State<RecordingSheet>
         .listen((amp) {
       if (!mounted) return;
       setState(() {
+        _rawAmplitudes.add(amp.current);
         _liveSamples.add(kIsWeb
             ? SoftLimiter.webProcess(amp.current)
             : _limiter.process(amp.current));
@@ -234,6 +240,39 @@ class _RecordingSheetState extends State<RecordingSheet>
     _maxDurationTimer = null;
     await _ampSub?.cancel();
     _clockTimer?.cancel();
+
+    // Calculate quality metrics BEFORE stopping (or right after)
+    final startTime = _recordStartTime;
+    final duration = startTime != null
+        ? DateTime.now().difference(startTime)
+        : _recordDuration;
+    
+    final avgAmp = _rawAmplitudes.isEmpty
+        ? -100.0
+        : _rawAmplitudes.reduce((a, b) => a + b) / _rawAmplitudes.length;
+    
+    debugPrint('[STEWYRT][RECORD] Quality check — duration: ${duration.inMilliseconds}ms, avg amplitude: ${avgAmp.toStringAsFixed(2)}dB');
+
+    if (duration.inMilliseconds < 2000 || avgAmp < -50.0) {
+      debugPrint('[STEWYRT][RECORD] ❌ Recording rejected — too short or silent');
+      await _recorder.stop();
+      await _resetRecorder();
+      if (mounted) {
+        setState(() {
+          _state = _RecordState.idle;
+          _liveSamples.clear();
+          _rawAmplitudes.clear();
+          _recordDuration = Duration.zero;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("We didn't catch anything — make sure your mic is on and give us a few seconds!"),
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
 
     final path = await _recorder.stop();
     debugPrint('[STEWYRT][RECORD] Recorder stopped — file path: $path');

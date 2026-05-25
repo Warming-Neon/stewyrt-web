@@ -147,9 +147,14 @@ export const analyzeAudio = onObjectFinalized(
             systemInstruction:
               `Listen to this audio. Respond with ONLY a JSON object: ` +
               `{ "isHuman": true|false, "isContinuousSpeech": true|false, "durationSeconds": number, "note": string }. ` +
-              `isHuman is true if this is a real human voice (not synthesised, not silence, not pure noise). ` +
-              `isContinuousSpeech is true if the speech is continuous and natural, not a recording of a recording ` +
-              `or a fragmented clip. note is a brief sentence explaining the assessment.`,
+              `RULES: ` +
+              `1. isHuman is true ONLY if this is a real, live human voice. ` +
+              `2. Silence, music, or ambient noise MUST return isHuman: false. ` +
+              `3. Synthetic or TTS (Text-to-Speech) voices MUST return isHuman: false. ` +
+              `4. Recording of a recording (playback) MUST return isHuman: false and isContinuousSpeech: false. ` +
+              `5. Audio under 2 seconds MUST return isHuman: false regardless of content. ` +
+              `6. isContinuousSpeech is true if the speech is natural and continuous. ` +
+              `7. note is a brief sentence explaining the assessment.`,
             responseMimeType: "application/json",
             safetySettings,
           },
@@ -176,8 +181,14 @@ export const analyzeAudio = onObjectFinalized(
 
       // Write the verified profile only on Gemini success.
       if (detection !== null) {
+        // LAYER 2 — Cloud Function validation
+        // durationSeconds < 2 OR isHuman === false: write verifiedAsHuman: false
+        // Do not trust Gemini's response if durationSeconds is missing or null
+        const isDurationValid = typeof detection.durationSeconds === "number" && detection.durationSeconds >= 2;
+        const verifiedAsHuman = isDurationValid && (detection.isHuman === true);
+
         await db.collection("users").doc(uuid).set({
-          verifiedAsHuman:         detection.isHuman            ?? false,
+          verifiedAsHuman:         verifiedAsHuman,
           isContinuousSpeech:      detection.isContinuousSpeech ?? false,
           durationSeconds:         detection.durationSeconds     ?? 0,
           verificationNote:        detection.note               ?? "",

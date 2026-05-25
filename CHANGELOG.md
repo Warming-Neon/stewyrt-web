@@ -5,6 +5,17 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Feat: Silent/muted recording guardrails across three layers
+
+- **Layer 1 (Client-side gate)**:
+  - **`lib/widgets/recording_sheet.dart`**, **`lib/screens/onboarding_screen.dart`**, **`lib/screens/day_one_screen.dart`**: Implemented duration and amplitude checks before upload. Recordings under 2 seconds or with an average amplitude below -50dB are now rejected immediately with a user-friendly message.
+- **Layer 2 (Cloud Function validation)**:
+  - **`functions/src/index.ts`**: Added server-side re-validation of Gemini's bot detection response. `verifiedAsHuman` is now strictly `false` if `durationSeconds < 2`, ensuring short/silent bypasses are caught even if Gemini misclassifies them.
+- **Layer 3 (Bot detection prompt hardening)**:
+  - **`functions/src/index.ts`**: Hardened the Gemini bot detection system instruction with explicit rules for silence, noise, synthetic voices, and recordings of recordings.
+
+---
+
 ## [2026-05-25] — Feat: Child Safety Policy link; Firebase Hosting static rewrites
 
 - **`lib/screens/settings_screen.dart`**: Added "Child Safety Policy" link to the LEGAL section, pointing to `https://stewyrt.com/child-safety.html`.

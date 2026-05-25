@@ -63,7 +63,9 @@ class _DayOneScreenState extends State<DayOneScreen>
   AudioRecorder _recorder = AudioRecorder();
   bool _pressActive = false;
   final List<double> _liveSamples = [];
+  final List<double> _rawAmplitudes = [];
   final _limiter = const SoftLimiter();
+  DateTime? _recordStartTime;
   Duration _recordDuration = Duration.zero;
   Timer? _clockTimer;
   Timer? _maxDurationTimer;
@@ -164,6 +166,9 @@ class _DayOneScreenState extends State<DayOneScreen>
       path: path,
     );
 
+    _recordStartTime = DateTime.now();
+    _rawAmplitudes.clear();
+
     if (!_pressActive) {
       await _recorder.stop();
       await _resetRecorder();
@@ -176,9 +181,12 @@ class _DayOneScreenState extends State<DayOneScreen>
         .onAmplitudeChanged(const Duration(milliseconds: 50))
         .listen((amp) {
       if (!mounted) return;
-      setState(() => _liveSamples.add(kIsWeb
-          ? SoftLimiter.webProcess(amp.current)
-          : _limiter.process(amp.current)));
+      setState(() {
+        _rawAmplitudes.add(amp.current);
+        _liveSamples.add(kIsWeb
+            ? SoftLimiter.webProcess(amp.current)
+            : _limiter.process(amp.current));
+      });
     });
 
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -203,6 +211,44 @@ class _DayOneScreenState extends State<DayOneScreen>
     _maxDurationTimer = null;
     await _ampSub?.cancel();
     _clockTimer?.cancel();
+
+    final startTime = _recordStartTime;
+    final duration = startTime != null
+        ? DateTime.now().difference(startTime)
+        : _recordDuration;
+
+    final avgAmp = _rawAmplitudes.isEmpty
+        ? -100.0
+        : _rawAmplitudes.reduce((a, b) => a + b) / _rawAmplitudes.length;
+
+    debugPrint('[STEWYRT][DAY1] Quality check — duration: ${duration.inMilliseconds}ms, avg amplitude: ${avgAmp.toStringAsFixed(2)}dB');
+
+    if (duration.inMilliseconds < 2000 || avgAmp < -50.0) {
+      debugPrint('[STEWYRT][DAY1] ❌ Recording rejected — too short or silent');
+      await _recorder.stop();
+      await _resetRecorder();
+      if (mounted) {
+        setState(() {
+          _state = _D1State.idle;
+          _liveSamples.clear();
+          _rawAmplitudes.clear();
+          _recordDuration = Duration.zero;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF1A1A1A),
+            behavior: SnackBarBehavior.floating,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            content: Text(
+              "We didn't catch anything — make sure your mic is on and give us a few seconds!",
+              style: GoogleFonts.spaceGrotesk(fontSize: 13, color: const Color(0xFFF5F5F5)),
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
 
     final filePath = await _recorder.stop();
     if (filePath == null || !mounted) return;

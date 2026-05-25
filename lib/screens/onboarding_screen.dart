@@ -52,9 +52,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool _isRecording = false;
   bool _pressActive = false;
   Timer? _maxDurationTimer;
+  DateTime? _recordStartTime;
 
   // ── Waveform ───────────────────────────────────────────────────────────────
   final List<double> _liveSamples = [];
+  final List<double> _rawAmplitudes = [];
   StreamSubscription<Amplitude>? _ampSub;
   final SoftLimiter _limiter = const SoftLimiter();
 
@@ -299,6 +301,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       path: filePath,
     );
 
+    _recordStartTime = DateTime.now();
+    _rawAmplitudes.clear();
+
     // User released before start() finished — abort cleanly.
     if (!_pressActive) {
       await _recorder.stop();
@@ -315,9 +320,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         .onAmplitudeChanged(const Duration(milliseconds: 50))
         .listen((amp) {
       if (!mounted) return;
-      setState(() => _liveSamples.add(kIsWeb
-          ? SoftLimiter.webProcess(amp.current)
-          : _limiter.process(amp.current)));
+      setState(() {
+        _rawAmplitudes.add(amp.current);
+        _liveSamples.add(kIsWeb
+            ? SoftLimiter.webProcess(amp.current)
+            : _limiter.process(amp.current));
+      });
     });
 
     setState(() => _isRecording = true);
@@ -340,6 +348,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       setState(() {
         _isRecording = false;
         _liveSamples.clear();
+        _rawAmplitudes.clear();
       });
     }
   }
@@ -354,6 +363,44 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     HapticFeedback.heavyImpact();
 
+    final startTime = _recordStartTime;
+    final duration = startTime != null
+        ? DateTime.now().difference(startTime)
+        : Duration.zero;
+
+    final avgAmp = _rawAmplitudes.isEmpty
+        ? -100.0
+        : _rawAmplitudes.reduce((a, b) => a + b) / _rawAmplitudes.length;
+
+    debugPrint('[BOUNCER] Quality check — duration: ${duration.inMilliseconds}ms, avg amplitude: ${avgAmp.toStringAsFixed(2)}dB');
+
+    if (duration.inMilliseconds < 2000 || avgAmp < -50.0) {
+      debugPrint('[BOUNCER] ❌ Recording rejected — too short or silent');
+      await _recorder.stop();
+      await _recorder.dispose();
+      _recorder = AudioRecorder();
+      if (mounted) {
+        setState(() {
+          _isRecording = false;
+          _liveSamples.clear();
+          _rawAmplitudes.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF1A1A1A),
+            behavior: SnackBarBehavior.floating,
+            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            content: Text(
+              "We didn't catch anything — make sure your mic is on and give us a few seconds!",
+              style: GoogleFonts.spaceGrotesk(fontSize: 13, color: _offWhite),
+            ),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
     final recordedPath = await _recorder.stop();
     await _recorder.dispose();
     _recorder = AudioRecorder();
@@ -364,6 +411,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       setState(() {
         _isRecording = false;
         _liveSamples.clear();
+        _rawAmplitudes.clear();
       });
       return;
     }
@@ -374,6 +422,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       _isRecording = false;
       _isUploading = true;
       _liveSamples.clear();
+      _rawAmplitudes.clear();
     });
 
     final user = FirebaseAuth.instance.currentUser;
