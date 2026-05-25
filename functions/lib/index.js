@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.submitContentReport = exports.deleteUserData = exports.submitModerationReview = exports.scheduleUpcomingQuestionsManual = exports.scheduleUpcomingQuestions = exports.submitSelfReportedDemographics = exports.purgeOldSentimentAudio = exports.analyzeAudio = void 0;
+exports.activateDailyQuestionManual = exports.activateDailyQuestion = exports.submitContentReport = exports.deleteUserData = exports.submitModerationReview = exports.scheduleUpcomingQuestionsManual = exports.scheduleUpcomingQuestions = exports.submitSelfReportedDemographics = exports.purgeOldSentimentAudio = exports.analyzeAudio = void 0;
 const admin = require("firebase-admin");
 const fs = require("fs");
 const os = require("os");
@@ -40,7 +40,7 @@ const ALLOWED_REGIONS = ["Northern Europe", "Western Europe", "Southern Europe",
 //   onboarding_* → bot-detection verification flow
 //   everything else → sentiment analysis flow
 exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey], bucket: "stewyrt-11.firebasestorage.app" }, async (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
     const filePath = event.data.name;
     // Only process uploads into audio_uploads/
     if (!filePath || !filePath.startsWith("audio_uploads/"))
@@ -110,9 +110,14 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
                 config: {
                     systemInstruction: `Listen to this audio. Respond with ONLY a JSON object: ` +
                         `{ "isHuman": true|false, "isContinuousSpeech": true|false, "durationSeconds": number, "note": string }. ` +
-                        `isHuman is true if this is a real human voice (not synthesised, not silence, not pure noise). ` +
-                        `isContinuousSpeech is true if the speech is continuous and natural, not a recording of a recording ` +
-                        `or a fragmented clip. note is a brief sentence explaining the assessment.`,
+                        `RULES: ` +
+                        `1. isHuman is true ONLY if this is a real, live human voice. ` +
+                        `2. Silence, music, or ambient noise MUST return isHuman: false. ` +
+                        `3. Synthetic or TTS (Text-to-Speech) voices MUST return isHuman: false. ` +
+                        `4. Recording of a recording (playback) MUST return isHuman: false and isContinuousSpeech: false. ` +
+                        `5. Audio under 2 seconds MUST return isHuman: false regardless of content. ` +
+                        `6. isContinuousSpeech is true if the speech is natural and continuous. ` +
+                        `7. note is a brief sentence explaining the assessment.`,
                     responseMimeType: "application/json",
                     safetySettings,
                 },
@@ -140,11 +145,16 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
         }
         // Write the verified profile only on Gemini success.
         if (detection !== null) {
+            // LAYER 2 — Cloud Function validation
+            // durationSeconds < 2 OR isHuman === false: write verifiedAsHuman: false
+            // Do not trust Gemini's response if durationSeconds is missing or null
+            const isDurationValid = typeof detection.durationSeconds === "number" && detection.durationSeconds >= 2;
+            const verifiedAsHuman = isDurationValid && (detection.isHuman === true);
             await db.collection("users").doc(uuid).set({
-                verifiedAsHuman: (_d = detection.isHuman) !== null && _d !== void 0 ? _d : false,
-                isContinuousSpeech: (_e = detection.isContinuousSpeech) !== null && _e !== void 0 ? _e : false,
-                durationSeconds: (_f = detection.durationSeconds) !== null && _f !== void 0 ? _f : 0,
-                verificationNote: (_g = detection.note) !== null && _g !== void 0 ? _g : "",
+                verifiedAsHuman: verifiedAsHuman,
+                isContinuousSpeech: (_d = detection.isContinuousSpeech) !== null && _d !== void 0 ? _d : false,
+                durationSeconds: (_e = detection.durationSeconds) !== null && _e !== void 0 ? _e : 0,
+                verificationNote: (_f = detection.note) !== null && _f !== void 0 ? _f : "",
                 verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
                 verificationAttempts: newAttemptCount,
                 verificationWindowStart: newWindowStart,
@@ -154,9 +164,9 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
     else {
         // ── SENTIMENT ANALYSIS FLOW ──────────────────────────────────────────────
         const uuid = fileName.replace(/\.m4a$/, "");
-        const question = (_h = metadata["question"]) !== null && _h !== void 0 ? _h : "What is on your mind right now?";
-        const rawResponseId = (_j = metadata["responseId"]) !== null && _j !== void 0 ? _j : "";
-        const rawPollId = (_k = metadata["pollId"]) !== null && _k !== void 0 ? _k : "";
+        const question = (_g = metadata["question"]) !== null && _g !== void 0 ? _g : "What is on your mind right now?";
+        const rawResponseId = (_h = metadata["responseId"]) !== null && _h !== void 0 ? _h : "";
+        const rawPollId = (_j = metadata["pollId"]) !== null && _j !== void 0 ? _j : "";
         // 1.2 — Derive a server-trusted responseId.
         // Trust only if it matches UUID v4; otherwise fall back to the storage filename UUID.
         const trustedResponseId = UUID_V4_RE.test(rawResponseId) ? rawResponseId : uuid;
@@ -255,7 +265,7 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
                     safetySettings,
                 },
             });
-            const raw = ((_l = result.text) !== null && _l !== void 0 ? _l : "").trim();
+            const raw = ((_k = result.text) !== null && _k !== void 0 ? _k : "").trim();
             const json = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
             analysis = JSON.parse(json);
             if (analysis.blocked === true) {
@@ -307,7 +317,11 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
                 blocked: false,
                 createdAt: admin.firestore.FieldValue.serverTimestamp(),
             };
-            // Store UID when derivable — used by the rate limiter on subsequent submissions.
+            // UID derivation: storage triggers have no auth context. UID is parsed
+            // from responseId when it is in production format ({uid}_{pollId}).
+            // In beta mode (UUID v4 responseId) UID is unavailable — no uid field
+            // is written. Beta-mode responses are excluded from GDPR erasure via
+            // deleteUserData; the 120-day audio purge is their only erasure path.
             if (rateUid)
                 doc["uid"] = rateUid;
             tx.set(responseRef, doc);
@@ -417,6 +431,21 @@ exports.submitSelfReportedDemographics = (0, https_1.onCall)(async (request) => 
     }, { merge: true });
     return { success: true };
 });
+// ── updateQuestionUsage ───────────────────────────────────────────────────────
+// Increments times_used, sets last_used_date, and sets first_used_date only on
+// first use. Called by runDailyActivation when a question goes live.
+async function updateQuestionUsage(db, questionId, isFirstUse) {
+    const ref = db.collection("questions").doc(questionId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const update = {
+        times_used: admin.firestore.FieldValue.increment(1),
+        last_used_date: admin.firestore.FieldValue.serverTimestamp(),
+    };
+    if (isFirstUse) {
+        update["first_used_date"] = admin.firestore.FieldValue.serverTimestamp();
+    }
+    await ref.update(update);
+}
 const WEEKDAY_NAMES = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 // Required pulse category per day-of-week. Saturday handled separately (alternates by week parity).
 const DAY_CATEGORY = {
@@ -425,6 +454,7 @@ const DAY_CATEGORY = {
     wednesday: "confessional",
     thursday: "provocative",
     friday: "whimsical",
+    saturday: "retrospective",
     sunday: "existential",
 };
 function utcDateStr(d) {
@@ -809,5 +839,131 @@ exports.submitContentReport = (0, https_1.onCall)(async (request) => {
         reviewed: false,
     });
     return { success: true };
+});
+async function runDailyActivation(db) {
+    const now = new Date();
+    const today = now.toISOString().slice(0, 10); // YYYY-MM-DD UTC
+    const isMonday = now.getUTCDay() === 1;
+    const summary = {
+        date: today,
+        pulseQuestionText: null,
+        newPulsePollId: null,
+        horizonActivated: false,
+        horizonReason: "",
+        horizonQuestionText: null,
+        newHorizonPollId: null,
+        previousPollsDeactivated: [],
+        warnings: [],
+    };
+    // 1. Read today's schedule entry.
+    const schedSnap = await db.collection("question_schedule").doc(today).get();
+    if (!schedSnap.exists) {
+        const warn = `question_schedule/${today} missing — aborting activation`;
+        console.warn(`[ACTIVATION] ${warn}`);
+        summary.warnings.push(warn);
+        return summary;
+    }
+    const sched = schedSnap.data();
+    const pulseQuestionId = sched["pulse_question_id"];
+    const horizonQuestionId = sched["horizon_question_id"];
+    if (!pulseQuestionId) {
+        const warn = `question_schedule/${today} has no pulse_question_id — aborting activation`;
+        console.warn(`[ACTIVATION] ${warn}`);
+        summary.warnings.push(warn);
+        return summary;
+    }
+    // ── PULSE ACTIVATION ──────────────────────────────────────────────────────
+    const pulseQSnap = await db.collection("questions").doc(pulseQuestionId).get();
+    if (!pulseQSnap.exists) {
+        const warn = `questions/${pulseQuestionId} not found — aborting pulse activation`;
+        console.warn(`[ACTIVATION] ${warn}`);
+        summary.warnings.push(warn);
+        return summary;
+    }
+    const pulseQData = pulseQSnap.data();
+    const pulseText = pulseQData["text"];
+    const isFirstPulseUse = !pulseQData["first_used_date"];
+    // Deactivate previous active pulse polls.
+    const prevPulseSnap = await db.collection("polls")
+        .where("tier", "==", "pulse")
+        .where("isActive", "==", true)
+        .get();
+    const deactivateBatch = db.batch();
+    for (const doc of prevPulseSnap.docs) {
+        deactivateBatch.update(doc.ref, { isActive: false });
+        summary.previousPollsDeactivated.push(doc.id);
+    }
+    await deactivateBatch.commit();
+    // Create new pulse poll.
+    const newPulseRef = await db.collection("polls").add({
+        tier: "pulse",
+        question: pulseText,
+        questionId: pulseQuestionId,
+        isActive: true,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    await updateQuestionUsage(db, pulseQuestionId, isFirstPulseUse);
+    summary.pulseQuestionText = pulseText;
+    summary.newPulsePollId = newPulseRef.id;
+    console.log(`[ACTIVATION] Pulse activated — pollId: ${newPulseRef.id}, question: "${pulseText.slice(0, 60)}"`);
+    // ── HORIZON ACTIVATION (Mondays only) ────────────────────────────────────
+    if (!isMonday) {
+        summary.horizonReason = "not Monday";
+    }
+    else if (!horizonQuestionId) {
+        const warn = `question_schedule/${today} has no horizon_question_id — skipping horizon`;
+        console.warn(`[ACTIVATION] ${warn}`);
+        summary.warnings.push(warn);
+        summary.horizonReason = "no horizon_question_id in schedule";
+    }
+    else {
+        const horizonQSnap = await db.collection("questions").doc(horizonQuestionId).get();
+        if (!horizonQSnap.exists) {
+            const warn = `questions/${horizonQuestionId} not found — skipping horizon`;
+            console.warn(`[ACTIVATION] ${warn}`);
+            summary.warnings.push(warn);
+            summary.horizonReason = "horizon question doc missing";
+        }
+        else {
+            const horizonQData = horizonQSnap.data();
+            const horizonText = horizonQData["text"];
+            const isFirstHorizonUse = !horizonQData["first_used_date"];
+            // Deactivate previous active horizon polls.
+            const prevHorizonSnap = await db.collection("polls")
+                .where("tier", "==", "horizon")
+                .where("isActive", "==", true)
+                .get();
+            const horizonBatch = db.batch();
+            for (const doc of prevHorizonSnap.docs) {
+                horizonBatch.update(doc.ref, { isActive: false });
+                summary.previousPollsDeactivated.push(doc.id);
+            }
+            await horizonBatch.commit();
+            // Create new horizon poll.
+            const newHorizonRef = await db.collection("polls").add({
+                tier: "horizon",
+                question: horizonText,
+                questionId: horizonQuestionId,
+                isActive: true,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+            await updateQuestionUsage(db, horizonQuestionId, isFirstHorizonUse);
+            summary.horizonActivated = true;
+            summary.horizonReason = "Monday — activated";
+            summary.horizonQuestionText = horizonText;
+            summary.newHorizonPollId = newHorizonRef.id;
+            console.log(`[ACTIVATION] Horizon activated — pollId: ${newHorizonRef.id}, question: "${horizonText.slice(0, 60)}"`);
+        }
+    }
+    return summary;
+}
+// Scheduled: daily at 00:01 UTC.
+exports.activateDailyQuestion = (0, scheduler_1.onSchedule)({ schedule: "1 0 * * *", timeZone: "UTC" }, async () => { await runDailyActivation(admin.firestore()); });
+// Callable: immediate manual trigger. Returns the full ActivationSummary.
+exports.activateDailyQuestionManual = (0, https_1.onCall)(async (request) => {
+    if (!request.auth) {
+        throw new https_1.HttpsError("unauthenticated", "Authentication required.");
+    }
+    return await runDailyActivation(admin.firestore());
 });
 //# sourceMappingURL=index.js.map

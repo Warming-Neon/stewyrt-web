@@ -71,7 +71,7 @@ stewyrt/
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, activateDailyQuestion, activateDailyQuestionManual
 │
 ├── scripts/
 │   ├── seed_questions.js                 — Idempotent seed: populates questions collection; uses ../functions/node_modules/firebase-admin
@@ -79,7 +79,9 @@ stewyrt/
 │   ├── seed_verification_prompts.js      — Idempotent seed: 18 prompts to verification_prompts (prompt_01–prompt_18)
 │   ├── seed_waiting_phrases.js           — Idempotent seed: 42 waiting phrases (4 acts) to waiting_phrases collection
 │   ├── fix_ice_breaker_poll_ids.js       — One-shot backfill: sets pollId='ice_breaker_v1' on responses where pollId==""; corrects total_submissions String→int
-│   └── backfill_blocked_field.ts         — One-shot backfill: stamps blocked=false on pre-migration approved responses
+│   ├── backfill_blocked_field.ts         — One-shot backfill: stamps blocked=false on pre-migration approved responses
+│   ├── cleanup_placeholder_polls.js      — One-shot cleanup: deletes placeholder pulse/horizon polls and their responses; idempotent
+│   └── seed_first_live_polls.js          — One-shot seed: creates polls/pulse_live_v1 and polls/horizon_live_v1; idempotent
 │
 ├── assets/
 │   └── icon/stewyrt_icon.png

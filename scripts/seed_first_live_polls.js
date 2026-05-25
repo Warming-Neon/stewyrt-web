@@ -2,7 +2,8 @@
 // One-shot seed: creates the first live pulse and horizon poll documents
 // with hardcoded IDs. Idempotent — will not overwrite existing documents.
 
-const { initializeApp, cert } = require("firebase-admin/app");
+const admin = require("firebase-admin");
+admin.initializeApp({ credential: admin.credential.cert(process.env.GOOGLE_APPLICATION_CREDENTIALS) });
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
 const POLLS = [
@@ -23,7 +24,6 @@ const POLLS = [
 ];
 
 async function main() {
-  initializeApp({ credential: cert(process.env.GOOGLE_APPLICATION_CREDENTIALS) });
   const db = getFirestore();
 
   for (const poll of POLLS) {

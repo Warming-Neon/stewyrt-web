@@ -2,8 +2,9 @@
 // One-shot cleanup: removes placeholder pulse and horizon polls and all
 // response documents that reference them. Idempotent — safe to run twice.
 
-const { initializeApp, cert } = require("firebase-admin/app");
-const { getFirestore }        = require("firebase-admin/firestore");
+const admin = require("firebase-admin");
+admin.initializeApp({ credential: admin.credential.cert(process.env.GOOGLE_APPLICATION_CREDENTIALS) });
+const { getFirestore } = require("firebase-admin/firestore");
 
 const PLACEHOLDER_POLL_IDS = [
   "SDIQeGRTg9DdXu8PUzD7", // placeholder pulse
@@ -37,7 +38,6 @@ async function deletePoll(db, pollId) {
 }
 
 async function main() {
-  initializeApp({ credential: cert(process.env.GOOGLE_APPLICATION_CREDENTIALS) });
   const db = getFirestore();
 
   let totalResponsesDeleted = 0;

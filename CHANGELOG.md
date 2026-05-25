@@ -5,6 +5,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Feat: Daily question activation system
+
+### Cloud Functions (`functions/src/index.ts`)
+- **`activateDailyQuestion`** (scheduled, 00:01 UTC daily): reads `question_schedule/{today}`, creates a new active pulse poll, deactivates the previous active pulse poll, and writes `times_used` / `last_used_date` / `first_used_date` back to the question document. On Mondays, does the same for the horizon tier.
+- **`activateDailyQuestionManual`** (onCall): identical logic, callable for immediate manual trigger. Returns full `ActivationSummary`.
+- **`updateQuestionUsage`** (internal helper): increments `times_used`, sets `last_used_date`, sets `first_used_date` only on first activation. Called exclusively by `runDailyActivation`.
+- **`DAY_CATEGORY`**: added `saturday: "retrospective"` — was missing, causing the scheduler to log a gap warning every Saturday.
+- **UID on response writes**: storage triggers have no auth context. UID is derived server-side from production-format `responseId` (`{uid}_{pollId}`) and written as the `uid` field. Beta-mode responses (UUID v4 `responseId`) carry no `uid` field — documented in code comment. Gap accepted; `deleteUserData` only covers production-mode responses.
+
+### Scripts
+- **`scripts/cleanup_placeholder_polls.js`**: deletes all responses referencing `SDIQeGRTg9DdXu8PUzD7` (placeholder pulse) and `vAFqqAiBhGfYAEN7OPtl` (placeholder horizon), then deletes the poll documents. Idempotent. Ran: 32 responses deleted, 2 polls deleted.
+- **`scripts/seed_first_live_polls.js`**: creates `polls/pulse_live_v1` and `polls/horizon_live_v1` with hardcoded content. Idempotent (skips if doc exists). Ran: both created, then correctly deactivated by the first activation run.
+
+### Deployment
+- All 10 Cloud Functions deployed to `stewyrt-11` (us-central1). First live activation ran 2026-05-25 (Monday): pulse and horizon both activated from `question_schedule/2026-05-25`.
+
+---
+
 ## [2026-05-25] — Feat: Silent/muted recording guardrails across three layers
 
 - **Layer 1 (Client-side gate)**:
