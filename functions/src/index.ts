@@ -501,6 +501,26 @@ export const submitSelfReportedDemographics = onCall(async (request) => {
   return { success: true };
 });
 
+// ── updateQuestionUsage ───────────────────────────────────────────────────────
+// Increments times_used, sets last_used_date, and sets first_used_date only on
+// first use. Called by runDailyActivation when a question goes live.
+async function updateQuestionUsage(
+  db:         admin.firestore.Firestore,
+  questionId: string,
+  isFirstUse: boolean,
+): Promise<void> {
+  const ref = db.collection("questions").doc(questionId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const update: Record<string, any> = {
+    times_used:     admin.firestore.FieldValue.increment(1),
+    last_used_date: admin.firestore.FieldValue.serverTimestamp(),
+  };
+  if (isFirstUse) {
+    update["first_used_date"] = admin.firestore.FieldValue.serverTimestamp();
+  }
+  await ref.update(update);
+}
+
 // ── Question rotation ─────────────────────────────────────────────────────────
 // Two exports sharing a single runScheduler() core:
 //   scheduleUpcomingQuestions       — fires every Sunday at 02:00 UTC
