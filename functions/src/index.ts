@@ -1003,3 +1003,168 @@ export const submitContentReport = onCall(async (request) => {
 
   return { success: true };
 });
+
+// ── Daily question activation ─────────────────────────────────────────────────
+// Reads today's question_schedule entry, creates new active poll documents for
+// pulse (daily) and horizon (Mondays only), deactivates the previous active polls,
+// and calls updateQuestionUsage for each activated question.
+// NEVER touches ice_breaker_v1 or any ice_breaker tier poll.
+
+interface ActivationSummary {
+  date:                    string;
+  pulseQuestionText:       string | null;
+  newPulsePollId:          string | null;
+  horizonActivated:        boolean;
+  horizonReason:           string;
+  horizonQuestionText:     string | null;
+  newHorizonPollId:        string | null;
+  previousPollsDeactivated: string[];
+  warnings:                string[];
+}
+
+async function runDailyActivation(db: admin.firestore.Firestore): Promise<ActivationSummary> {
+  const now     = new Date();
+  const today   = now.toISOString().slice(0, 10); // YYYY-MM-DD UTC
+  const isMonday = now.getUTCDay() === 1;
+
+  const summary: ActivationSummary = {
+    date:                    today,
+    pulseQuestionText:       null,
+    newPulsePollId:          null,
+    horizonActivated:        false,
+    horizonReason:           "",
+    horizonQuestionText:     null,
+    newHorizonPollId:        null,
+    previousPollsDeactivated: [],
+    warnings:                [],
+  };
+
+  // 1. Read today's schedule entry.
+  const schedSnap = await db.collection("question_schedule").doc(today).get();
+  if (!schedSnap.exists) {
+    const warn = `question_schedule/${today} missing — aborting activation`;
+    console.warn(`[ACTIVATION] ${warn}`);
+    summary.warnings.push(warn);
+    return summary;
+  }
+
+  const sched = schedSnap.data()!;
+  const pulseQuestionId   = sched["pulse_question_id"]   as string | undefined;
+  const horizonQuestionId = sched["horizon_question_id"] as string | undefined;
+
+  if (!pulseQuestionId) {
+    const warn = `question_schedule/${today} has no pulse_question_id — aborting activation`;
+    console.warn(`[ACTIVATION] ${warn}`);
+    summary.warnings.push(warn);
+    return summary;
+  }
+
+  // ── PULSE ACTIVATION ──────────────────────────────────────────────────────
+  const pulseQSnap = await db.collection("questions").doc(pulseQuestionId).get();
+  if (!pulseQSnap.exists) {
+    const warn = `questions/${pulseQuestionId} not found — aborting pulse activation`;
+    console.warn(`[ACTIVATION] ${warn}`);
+    summary.warnings.push(warn);
+    return summary;
+  }
+
+  const pulseQData = pulseQSnap.data()!;
+  const pulseText  = pulseQData["text"] as string;
+  const isFirstPulseUse = !pulseQData["first_used_date"];
+
+  // Deactivate previous active pulse polls.
+  const prevPulseSnap = await db.collection("polls")
+    .where("tier", "==", "pulse")
+    .where("isActive", "==", true)
+    .get();
+
+  const deactivateBatch = db.batch();
+  for (const doc of prevPulseSnap.docs) {
+    deactivateBatch.update(doc.ref, { isActive: false });
+    summary.previousPollsDeactivated.push(doc.id);
+  }
+  await deactivateBatch.commit();
+
+  // Create new pulse poll.
+  const newPulseRef = await db.collection("polls").add({
+    tier:       "pulse",
+    question:   pulseText,
+    questionId: pulseQuestionId,
+    isActive:   true,
+    createdAt:  admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await updateQuestionUsage(db, pulseQuestionId, isFirstPulseUse);
+
+  summary.pulseQuestionText = pulseText;
+  summary.newPulsePollId    = newPulseRef.id;
+  console.log(`[ACTIVATION] Pulse activated — pollId: ${newPulseRef.id}, question: "${pulseText.slice(0, 60)}"`);
+
+  // ── HORIZON ACTIVATION (Mondays only) ────────────────────────────────────
+  if (!isMonday) {
+    summary.horizonReason = "not Monday";
+  } else if (!horizonQuestionId) {
+    const warn = `question_schedule/${today} has no horizon_question_id — skipping horizon`;
+    console.warn(`[ACTIVATION] ${warn}`);
+    summary.warnings.push(warn);
+    summary.horizonReason = "no horizon_question_id in schedule";
+  } else {
+    const horizonQSnap = await db.collection("questions").doc(horizonQuestionId).get();
+    if (!horizonQSnap.exists) {
+      const warn = `questions/${horizonQuestionId} not found — skipping horizon`;
+      console.warn(`[ACTIVATION] ${warn}`);
+      summary.warnings.push(warn);
+      summary.horizonReason = "horizon question doc missing";
+    } else {
+      const horizonQData = horizonQSnap.data()!;
+      const horizonText  = horizonQData["text"] as string;
+      const isFirstHorizonUse = !horizonQData["first_used_date"];
+
+      // Deactivate previous active horizon polls.
+      const prevHorizonSnap = await db.collection("polls")
+        .where("tier", "==", "horizon")
+        .where("isActive", "==", true)
+        .get();
+
+      const horizonBatch = db.batch();
+      for (const doc of prevHorizonSnap.docs) {
+        horizonBatch.update(doc.ref, { isActive: false });
+        summary.previousPollsDeactivated.push(doc.id);
+      }
+      await horizonBatch.commit();
+
+      // Create new horizon poll.
+      const newHorizonRef = await db.collection("polls").add({
+        tier:       "horizon",
+        question:   horizonText,
+        questionId: horizonQuestionId,
+        isActive:   true,
+        createdAt:  admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      await updateQuestionUsage(db, horizonQuestionId, isFirstHorizonUse);
+
+      summary.horizonActivated    = true;
+      summary.horizonReason       = "Monday — activated";
+      summary.horizonQuestionText = horizonText;
+      summary.newHorizonPollId    = newHorizonRef.id;
+      console.log(`[ACTIVATION] Horizon activated — pollId: ${newHorizonRef.id}, question: "${horizonText.slice(0, 60)}"`);
+    }
+  }
+
+  return summary;
+}
+
+// Scheduled: daily at 00:01 UTC.
+export const activateDailyQuestion = onSchedule(
+  { schedule: "1 0 * * *", timeZone: "UTC" },
+  async () => { await runDailyActivation(admin.firestore()); },
+);
+
+// Callable: immediate manual trigger. Returns the full ActivationSummary.
+export const activateDailyQuestionManual = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  return await runDailyActivation(admin.firestore());
+});
