@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: switch Gemini SDK to Vertex AI billing via service account, remove AI Studio API key dependency
 
 ### Cloud Functions (`functions/src/index.ts`)
@@ -15,6 +22,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: correct web amplitude gate threshold for 0.0–1.0 compensated range
 
 ### Flutter Client
@@ -22,10 +36,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -38,10 +66,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -63,10 +105,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -81,10 +137,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -96,10 +166,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -110,10 +194,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -139,10 +237,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -166,10 +278,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -189,10 +315,24 @@ Removed 7 temporary `debugPrint` statements (`[FEED CHIP TAP]`, `[RECORDING]`, `
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -209,10 +349,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -233,10 +387,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -266,10 +434,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -299,10 +481,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -340,10 +536,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -383,10 +593,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -407,10 +631,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -437,10 +675,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -455,10 +707,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -493,10 +759,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 
@@ -544,10 +824,24 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
+
+---
+
 ## [2026-05-25] — Fix: use compensated amplitude for web recording gate
 
 ### Flutter Client
 - **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
+## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
+
+### Flutter Client
+- **`lib/screens/settings_screen.dart`**: Updated the "About Stewyrt" dialog content to more clearly articulate the anonymous data sharing policy and acknowledge support from Google for Startups.
 
 ---
 

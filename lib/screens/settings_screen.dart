@@ -222,8 +222,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       ),
                       content: Text(
-                        'Stewyrt is an anonymous, audio-only sentiment platform. We capture how the world '
-                        'is feeling — not who is feeling it. Your voice is your data. We never sell it.\n\n'
+                        'Stewyrt is an anonymous, audio-only sentiment platform. '
+                        'We capture how the world is feeling — not who is feeling it.\n\n'
+                        'Your voice is yours. We never sell your recordings or your '
+                        'personal data. What we do share — with researchers, journalists '
+                        'and organisations — is how the world feels. Anonymised, '
+                        'aggregated, and stripped of everything that could ever point '
+                        'back to you.\n\n'
+                        'Supported by Google for Startups.\n\n'
                         'Version $_version',
                         style: GoogleFonts.spaceGrotesk(
                           color: sub, fontSize: 14, height: 1.6,
