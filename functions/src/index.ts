@@ -539,6 +539,7 @@ const DAY_CATEGORY: Record<string, string> = {
   wednesday: "confessional",
   thursday:  "provocative",
   friday:    "whimsical",
+  saturday:  "retrospective",
   sunday:    "existential",
 };
 
