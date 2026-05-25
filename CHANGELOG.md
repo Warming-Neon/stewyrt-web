@@ -5,6 +5,16 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: switch Gemini SDK to Vertex AI billing via service account, remove AI Studio API key dependency
+
+### Cloud Functions (`functions/src/index.ts`)
+- Removed `defineSecret("GEMINI_API_KEY")` and the `secrets: [geminiApiKey]` binding from `analyzeAudio` — the AI Studio API key is no longer passed to the SDK.
+- Both `GoogleGenAI` initialisations (bot-detection flow and sentiment analysis flow) switched from `{ apiKey: geminiApiKey.value() }` to `{ vertexai: true, project: "stewyrt-11", location: "us-central1" }`.
+- Removed unused `import { defineSecret } from "firebase-functions/params"`.
+- The `GEMINI_API_KEY` secret is retained in Secret Manager but is no longer consumed by the function.
+
+---
+
 ## [2026-05-25] — Fix: correct web amplitude gate threshold for 0.0–1.0 compensated range
 
 ### Flutter Client

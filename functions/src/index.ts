@@ -5,7 +5,6 @@ import * as path from "path";
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { defineSecret } from "firebase-functions/params";
 import {
   GoogleGenAI,
   HarmCategory,
@@ -13,10 +12,6 @@ import {
 } from "@google/genai";
 
 admin.initializeApp();
-
-// Store your Gemini API key in Google Cloud Secret Manager:
-//   firebase functions:secrets:set GEMINI_API_KEY
-const geminiApiKey = defineSecret("GEMINI_API_KEY");
 
 // Used to validate whether a client-supplied responseId can be trusted.
 const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -65,7 +60,7 @@ const ALLOWED_REGIONS: string[]     = ["Northern Europe", "Western Europe", "Sou
 //   onboarding_* → bot-detection verification flow
 //   everything else → sentiment analysis flow
 export const analyzeAudio = onObjectFinalized(
-  { secrets: [geminiApiKey], bucket: "stewyrt-11.firebasestorage.app" },
+  { bucket: "stewyrt-11.firebasestorage.app" },
   async (event) => {
     const filePath = event.data.name;
 
@@ -130,7 +125,7 @@ export const analyzeAudio = onObjectFinalized(
 
       try {
         const base64Audio = fs.readFileSync(tempFilePath).toString("base64");
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+        const ai = new GoogleGenAI({ vertexai: true, project: "stewyrt-11", location: "us-central1" });
 
         const result = await ai.models.generateContent({
           model: "gemini-2.5-flash",
@@ -268,7 +263,7 @@ export const analyzeAudio = onObjectFinalized(
       try {
         const base64Audio = fs.readFileSync(tempFilePath).toString("base64");
 
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+        const ai = new GoogleGenAI({ vertexai: true, project: "stewyrt-11", location: "us-central1" });
 
         const result = await ai.models.generateContent({
           model: "gemini-2.5-flash",
