@@ -5,12 +5,26 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-25] — Fix: Tighten rate limits, fix verification inconsistency, enforce beta mode rate limiting
 
 ### Cloud Functions (`functions/src/index.ts`)
 - **Sentiment Analysis Rate Limit**: Dropped threshold from 30 to 5 responses per rolling hour per user.
 - **Verification Rate Limit**: Fixed inconsistency where logic allowed 5 attempts while comments/UI specified 3; now strictly enforced at 3 attempts per 24 hours.
 - **Beta Mode Rate Limiting**: Previously skipped for UUID v4 response IDs (beta mode). Now derives UID from Firebase Auth context (`event.auth.uid`) to apply the same 5-per-hour limit. Submissions without a valid auth context are now blocked entirely.
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -32,6 +46,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-25] — Feat: Silent/muted recording guardrails across three layers
 
 - **Layer 1 (Client-side gate)**:
@@ -43,6 +64,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-25] — Feat: Child Safety Policy link; Firebase Hosting static rewrites
 
 - **`lib/screens/settings_screen.dart`**: Added "Child Safety Policy" link to the LEGAL section, pointing to `https://stewyrt.com/child-safety.html`.
@@ -51,10 +79,24 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-25] — Docs: Updated CONTEXT_MAP.md for codebase parity; bumped version
 
 - **`CONTEXT_MAP.md`**: Updated the project file map to include missing files (`verification_timeout_widget.dart` and `child-safety.html`) ensuring the map reflects the actual state of the codebase.
 - **`pubspec.yaml`**: Bumped version to `1.0.1+2`.
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -80,6 +122,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-15] — Fix: Resonance camera focus race conditions; brain visualiser node stability; web app icon
 
 ### Resonance focus — race condition fix (native + web)
@@ -100,6 +149,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-15] — Feat: pollId deep-link from feed chips; back-button fixes; debug print cleanup
 
 ### Feed chip → Resonance deep-link
@@ -116,6 +172,13 @@ Removed 7 temporary `debugPrint` statements (`[FEED CHIP TAP]`, `[RECORDING]`, `
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-14] — The Resonance UI overhaul (Phases 1–6): cosmic nebula, no bloom, brain outline, always-on labels, perf tier, warm colours
 
 All changes confined to `web/brain_visualizer.html`.
@@ -126,6 +189,13 @@ All changes confined to `web/brain_visualizer.html`.
 - **Phase 4 — Always-on node labels + tap shows % only:** every emotion node gets a billboarded `THREE.Sprite` label (bold 14px white, 128×32 canvas) 1.5 units above centre. Opacity 0.6–1.0 by node radius; fades to 0 when camera < 8 units; fades to 0.3 when screen-overlapped by a larger node. Tooltip on tap now shows percentage only (`"24.6%"` centred) — emotion word removed from tooltip (already on the always-on label).
 - **Phase 5 — Performance tier:** `detectPerformanceTier()` reads `WEBGL_debug_renderer_info` GPU string and `navigator.deviceMemory`. `low` tier: nebula 400 pts + `PointsMaterial` (no shader compile), filler 50 nodes, comets capped at 1 per path, icosahedron detail 1, pixel ratio capped at 1.5. `high` tier: 1200 pts + `ShaderMaterial`, 120 fillers, 1–3 comets, detail 2, pixel ratio ≤ 2.
 - **Phase 6 — Warmer node colours:** `regionColor()` replaces `regionHue()`, returning `{h,s,l}`. Prefrontal `0.70–0.82`/sat `0.85–1.0`; Amygdala `0.95–1.08` (wraps through pink/crimson)/sat `0.9–1.0`; Nucleus `0.12–0.28` (amber/warm green); Insula `0.48–0.58`. Membrane roughness `0.8→0.4`. Point lights shifted to violet palette: `#5566ff→#8855ff`, `#ff3366→#ff2266`, `#00ffaa→#aa44ff`.
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -143,6 +213,13 @@ All changes confined to `web/brain_visualizer.html`.
 ### Fix 3 — Tag chip navigated to wrong Resonance (pollId routing)
 - **`lib/screens/pulse_screen.dart`**: `_openRecording` call site in the PageView `itemBuilder` changed from `poll.question / poll.id` to `currentPoll.question / currentPoll.id`. The per-card `poll` variable (from the `itemBuilder` index parameter) and the active-card `currentPoll` variable are logically the same in normal use, but differ if a tap fires during a mid-swipe transition (`index != activeIdx`). Using `currentPoll` guarantees the actually-visible card's pollId reaches `RecordingSheet.widget.pollId`, which `_onTagTap` then forwards to `ResonanceScreen(pollId:)`.
 - **`lib/widgets/recording_sheet.dart`**: `_onTagTap` already passes `widget.pollId` to `ResonanceScreen` — no change needed.
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -172,6 +249,13 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-14] — Debug pass: post-deploy smoke test fixes (Bugs 1–6)
 
 ### Bug 1 — Android crash on Day One completion (`String not subtype of num?`)
@@ -195,6 +279,13 @@ All changes confined to `web/brain_visualizer.html`.
 
 ### Bug 6 — Mobile web nav bar icons overlapping tabs
 - **`lib/main.dart`**: `_RootShellState.build()` is now responsive on `MediaQuery.of(context).size.width >= 600`. Narrow (< 600px): adds a slim 40px `AppBar` housing settings (leading) and theme toggle (actions); bottom nav shows three tabs only with no `Stack`/`Positioned` elements. Wide (≥ 600px): previous Stack layout with positioned utility icons unchanged. Tab `Row` extracted as a local `tabs` variable to eliminate duplication.
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -229,6 +320,13 @@ All changes confined to `web/brain_visualizer.html`.
 - **`lib/widgets/sentiment_stream.dart`**: added `onLongPress` to feed item `GestureDetector` calling `_showReportSheet(context, item.id)`; added `_showReportSheet()` method; added `_ReportSheet` stateful widget (two-step flow: initial options list → reason picker, plus submitting / submitted states); added `_SheetRow` helper. `_submit()` captures `nav` before the `await`, auto-pops 900ms after success.
 - **`functions/src/index.ts`**: added `submitContentReport` callable. Validates `responseId` (UUID v4 regex) and `reason` (allowlist: harassment / hate_speech / spam / misinformation / other). Rate-limits to 10 reports per user per rolling hour. Verifies `responses/{responseId}` exists. Writes `{ responseId, reason, reportedBy, reportedAt, reviewed: false }` to `content_reports/{autoId}`.
 - **`firestore.rules`**: added `content_reports/{reportId}` — all access denied from clients (CF uses Admin SDK).
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -268,6 +366,13 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-09] — UI polish: nav 'S' logo, card tier labels, teal live dot, debug overlay removed
 
 ### Flutter client
@@ -282,6 +387,13 @@ All changes confined to `web/brain_visualizer.html`.
 ### Firestore — manual actions required
 - Existing horizon poll doc: add `tier: "horizon"` field so the card shows **HORIZON**.
 - Filler question: add new `polls` doc — `{ question: "What harmless things do you do that are bad but make you feel good?", category: "confessional", topic: "harmless pleasures", tier: "pulse", isActive: true, total_submissions: 0 }`.
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -308,6 +420,13 @@ All changes confined to `web/brain_visualizer.html`.
 
 ---
 
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
+
+---
+
 ## [2026-05-09] — Cost & security hardening: verification rate limiting, metadata trust removal
 
 ### Cloud Functions (`functions/src/index.ts`)
@@ -316,6 +435,13 @@ All changes confined to `web/brain_visualizer.html`.
 
 ### Storage (`storage.rules`)
 - **Comment update (FIX 3):** Added bandwidth-risk + App Check mitigation comment above the `audio_uploads/` read rule per audit recommendation.
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -347,6 +473,13 @@ All changes confined to `web/brain_visualizer.html`.
 ### Config & Housekeeping
 - `firebase.json`: added `firestore` and `storage` sections referencing new rules/indexes files
 - `.gitignore`: added `functions/lib/`, `.firebase/`, `.env`/`*.env`/`functions/.env`, `service-account*.json`, `*.keystore`, `ios/Pods/`
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 
@@ -391,6 +524,13 @@ All changes confined to `web/brain_visualizer.html`.
 ### Security
 - `npm audit fix` on `functions/`: patched `protobufjs` (critical — arbitrary code execution), `fast-xml-builder` (high — attribute injection), `fast-xml-parser` (moderate — XML/CDATA injection)
 - 9 low-severity `@tootallnate/once` vulns remain; fix requires downgrading `firebase-admin` to v10 (breaking) — deferred
+
+---
+
+## [2026-05-25] — Fix: use compensated amplitude for web recording gate
+
+### Flutter Client
+- **`lib/screens/onboarding_screen.dart`**, **`lib/widgets/recording_sheet.dart`**, **`lib/screens/day_one_screen.dart`**: Updated the `onAmplitudeChanged` listener to apply `SoftLimiter.webProcess(amp.current)` to `_rawAmplitudes` when running on the web (`kIsWeb`). This fixes a bug where the uncompensated Web Audio API frequency-domain dBFS values would incorrectly trigger the -50.0 dB gate even for valid speech.
 
 ---
 

@@ -182,7 +182,9 @@ class _DayOneScreenState extends State<DayOneScreen>
         .listen((amp) {
       if (!mounted) return;
       setState(() {
-        _rawAmplitudes.add(amp.current);
+        _rawAmplitudes.add(kIsWeb
+            ? SoftLimiter.webProcess(amp.current)
+            : amp.current);
         _liveSamples.add(kIsWeb
             ? SoftLimiter.webProcess(amp.current)
             : _limiter.process(amp.current));
