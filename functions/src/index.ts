@@ -212,36 +212,31 @@ export const analyzeAudio = onObjectFinalized(
       const rateUid = extractUidForRateLimit(rawResponseId) || (event as any).auth?.uid;
 
       if (!rateUid) {
-        console.warn("[STEWYRT] No auth context available — blocking submission");
-        if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-        await db.collection("responses").doc(trustedResponseId).set({
-          blocked:       true,
-          blockedReason: "unauthenticated",
-          createdAt:     admin.firestore.FieldValue.serverTimestamp(),
-        });
-        return;
+        console.warn("[STEWYRT] No auth context available — skipping rate limiting and proceeding");
       }
 
-      const oneHourAgo = admin.firestore.Timestamp.fromDate(
-        new Date(Date.now() - 60 * 60 * 1000),
-      );
-      const countSnap = await db
-        .collection("responses")
-        .where("uid", "==", rateUid)
-        .where("createdAt", ">", oneHourAgo)
-        .count()
-        .get();
+      if (rateUid) {
+        const oneHourAgo = admin.firestore.Timestamp.fromDate(
+          new Date(Date.now() - 60 * 60 * 1000),
+        );
+        const countSnap = await db
+          .collection("responses")
+          .where("uid", "==", rateUid)
+          .where("createdAt", ">", oneHourAgo)
+          .count()
+          .get();
 
-      if (countSnap.data().count >= 5) {
-        console.warn(`[STEWYRT] Rate limit hit for uid: ${rateUid}`);
-        if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
-        await db.collection("responses").doc(trustedResponseId).set({
-          blocked:       true,
-          blockedReason: "rate_limit",
-          uid:           rateUid,
-          createdAt:     admin.firestore.FieldValue.serverTimestamp(),
-        });
-        return;
+        if (countSnap.data().count >= 5) {
+          console.warn(`[STEWYRT] Rate limit hit for uid: ${rateUid}`);
+          if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+          await db.collection("responses").doc(trustedResponseId).set({
+            blocked:       true,
+            blockedReason: "rate_limit",
+            uid:           rateUid,
+            createdAt:     admin.firestore.FieldValue.serverTimestamp(),
+          });
+          return;
+        }
       }
 
       // 1.2 — Validate pollId: confirm the referenced poll document exists
@@ -337,6 +332,12 @@ export const analyzeAudio = onObjectFinalized(
       } catch (err: unknown) {
         console.error("Content blocked or Gemini analysis failed:", err);
         if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+        await db.collection("responses").doc(trustedResponseId).set({
+          blocked:       true,
+          blockedReason: "analysis_error",
+          error:         true,
+          createdAt:     admin.firestore.FieldValue.serverTimestamp(),
+        });
         return;
       }
 

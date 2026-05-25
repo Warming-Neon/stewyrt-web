@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Fix: skip rate limit on missing auth context, add sentiment error handling to prevent client hang
+
+### Cloud Functions (`functions/src/index.ts`)
+- **FIX 1 — Rate limiting fallback**: Storage triggers carry no auth context, so `event.auth` is always null. The previous code wrote `blocked: unauthenticated` and returned for every submission that could not derive a UID from `responseId`. Changed so that when `rateUid` is null, rate limiting is skipped entirely (with a `console.warn`) and analysis proceeds normally. The rate-limit Firestore query is now wrapped in an `if (rateUid)` guard.
+- **FIX 2 — Sentiment analysis error handling**: The `catch` block in the Gemini analysis path previously returned silently, leaving no Firestore document for the client to observe, causing the app to hang indefinitely. The catch block now writes `{ blocked: true, blockedReason: "analysis_error", error: true, createdAt: … }` to `responses/{trustedResponseId}` before returning.
+
+---
+
 ## [2026-05-25] — Fix: update About copy to clarify data policy and add Google for Startups credit
 
 ### Flutter Client
