@@ -2,7 +2,7 @@ name: stewyrt
 description: "An anonymous, audio-only social sentiment platform."
 publish_to: 'none'
 
-version: 1.0.1+2
+version: 1.0.1+3
 
 environment:
   sdk: ^3.11.1

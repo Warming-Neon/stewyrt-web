@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +27,7 @@ const String _iceBreakerId = 'ice_breaker_v1';
 
 // ── State machine ─────────────────────────────────────────────────────────────
 
-enum _D1State { idle, recording, waiting, results, blocked, timedOut }
+enum _D1State { idle, recording, previewing, waiting, results, blocked, timedOut }
 
 // ── Screen ────────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ class _DayOneScreenState extends State<DayOneScreen>
 
   // ── Recorder ──────────────────────────────────────────────────────────────
   AudioRecorder _recorder = AudioRecorder();
+  final _player   = AudioPlayer();
   bool _pressActive = false;
   final List<double> _liveSamples = [];
   final List<double> _rawAmplitudes = [];
@@ -71,6 +73,13 @@ class _DayOneScreenState extends State<DayOneScreen>
   Timer? _maxDurationTimer;
   StreamSubscription<Amplitude>? _ampSub;
 
+  // ── Playback ──────────────────────────────────────────────────────────────
+  Duration _playPosition = Duration.zero;
+  Duration _playTotal    = Duration.zero;
+  bool _isPlaying        = false;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _playerStateSub;
+
   // ── Waiting room story ────────────────────────────────────────────────────
 
   List<String> _currentStory = [];
@@ -80,6 +89,7 @@ class _DayOneScreenState extends State<DayOneScreen>
   // ── Pipeline ──────────────────────────────────────────────────────────────
   StreamSubscription? _firestoreSub;
   String? _blockedResponseId;
+  String? _pendingPath;
   AnalysisResult? _result;
 
   // ── Staggered results reveal ──────────────────────────────────────────────
@@ -105,9 +115,12 @@ class _DayOneScreenState extends State<DayOneScreen>
     _ampSub?.cancel();
     _clockTimer?.cancel();
     _maxDurationTimer?.cancel();
+    _positionSub?.cancel();
+    _playerStateSub?.cancel();
     _phraseTimer?.cancel();
     _firestoreSub?.cancel();
     _recorder.dispose();
+    _player.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -255,7 +268,67 @@ class _DayOneScreenState extends State<DayOneScreen>
     final filePath = await _recorder.stop();
     if (filePath == null || !mounted) return;
 
-    await _submit(filePath);
+    _pendingPath = filePath;
+    await _setupPlayer(filePath);
+    if (mounted) setState(() => _state = _D1State.previewing);
+  }
+
+  // ── Playback preview ──────────────────────────────────────────────────────
+
+  Future<void> _setupPlayer(String path) async {
+    if (kIsWeb) {
+      await _player.setUrl(path);
+    } else {
+      await _player.setFilePath(path);
+    }
+    _playTotal = _player.duration ?? Duration.zero;
+
+    _positionSub = _player.positionStream.listen((pos) {
+      if (mounted) setState(() => _playPosition = pos);
+    });
+    _playerStateSub = _player.playerStateStream.listen((s) {
+      if (mounted) setState(() => _isPlaying = s.playing);
+    });
+  }
+
+  Future<void> _togglePreview() async {
+    HapticFeedback.lightImpact();
+    if (_isPlaying) {
+      await _player.pause();
+    } else {
+      if (_playPosition >= _playTotal && _playTotal > Duration.zero) {
+        await _player.seek(Duration.zero);
+      }
+      await _player.play();
+    }
+  }
+
+  Future<void> _reRecord() async {
+    await _player.stop();
+    await _positionSub?.cancel();
+    await _playerStateSub?.cancel();
+    _positionSub    = null;
+    _playerStateSub = null;
+    await _resetRecorder();
+    setState(() {
+      _state          = _D1State.idle;
+      _liveSamples.clear();
+      _recordDuration = Duration.zero;
+      _playPosition   = Duration.zero;
+      _playTotal      = Duration.zero;
+      _isPlaying      = false;
+      _pendingPath    = null;
+    });
+  }
+
+  Future<void> _onSubmit() async {
+    if (_state != _D1State.previewing) return;
+    final path = _pendingPath;
+    if (path == null) return;
+
+    HapticFeedback.mediumImpact();
+    await _player.stop();
+    await _submit(path);
   }
 
   // ── Submission pipeline ───────────────────────────────────────────────────
@@ -397,6 +470,18 @@ class _DayOneScreenState extends State<DayOneScreen>
     return '$m:$s';
   }
 
+  List<double> _buildDisplayWaveform({int targetCount = 50}) {
+    if (_liveSamples.isEmpty) return [];
+    if (_liveSamples.length <= targetCount) return List.of(_liveSamples);
+    final step = _liveSamples.length / targetCount;
+    return List.generate(targetCount, (i) {
+      final start = (i * step).floor();
+      final end   = ((i + 1) * step).ceil().clamp(0, _liveSamples.length);
+      final slice = _liveSamples.sublist(start, end);
+      return slice.reduce((a, b) => a + b) / slice.length;
+    });
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -442,12 +527,13 @@ class _DayOneScreenState extends State<DayOneScreen>
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
                   child: switch (_state) {
-                    _D1State.idle      => _buildIdle(),
-                    _D1State.recording => _buildRecording(),
-                    _D1State.waiting   => _buildWaiting(),
-                    _D1State.results   => _buildResults(),
-                    _D1State.blocked   => _buildBlocked(),
-                    _D1State.timedOut  => _buildTimedOut(),
+                    _D1State.idle       => _buildIdle(),
+                    _D1State.recording  => _buildRecording(),
+                    _D1State.previewing => _buildPreviewing(),
+                    _D1State.waiting    => _buildWaiting(),
+                    _D1State.results    => _buildResults(),
+                    _D1State.blocked    => _buildBlocked(),
+                    _D1State.timedOut   => _buildTimedOut(),
                   },
                 ),
               ),
@@ -565,6 +651,105 @@ class _DayOneScreenState extends State<DayOneScreen>
               style: GoogleFonts.spaceGrotesk(fontSize: 13, color: const Color(0xFFAAAAAA)),
             ),
           ),
+        ),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  // ── Previewing ────────────────────────────────────────────────────────────
+
+  Widget _buildPreviewing() {
+    final displayWaveform = _buildDisplayWaveform();
+    final progress = _playTotal.inMilliseconds > 0
+        ? (_playPosition.inMilliseconds / _playTotal.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+    const fg  = Color(0xFFF5F5F5);
+    const sub = Color(0xFFAAAAAA);
+
+    return Column(
+      key: const ValueKey('previewing'),
+      children: [
+        const Spacer(),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: _togglePreview,
+                child: Container(
+                  width: 48, height: 48,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF5F5F5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    color: Colors.black,
+                    size: 26,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 36,
+                      child: CustomPaint(
+                        painter: _PlaybackWaveformPainter(
+                          bars:     displayWaveform,
+                          progress: progress,
+                          played:   fg,
+                          unplayed: sub.withValues(alpha: 0.3),
+                        ),
+                        size: const Size(double.infinity, 36),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _fmtDuration(_playPosition),
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 11, fontWeight: FontWeight.w600, color: fg,
+                          ),
+                        ),
+                        StreamBuilder<Duration?>(
+                          stream: _player.durationStream,
+                          builder: (context, snapshot) {
+                            final d = snapshot.data ?? Duration.zero;
+                            return Text(
+                              _fmtDuration(d),
+                              style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        Row(
+          children: [
+            Expanded(
+              child: _D1OutlineButton(label: 'Re-record', onTap: _reRecord),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _D1Button(label: 'Submit', onTap: _onSubmit),
+            ),
+          ],
         ),
         const SizedBox(height: 32),
       ],
@@ -920,4 +1105,74 @@ class _LiveWaveformPainter extends CustomPainter {
   @override
   bool shouldRepaint(_LiveWaveformPainter old) =>
       old.samples.length != samples.length || old.barColor != barColor;
+}
+
+class _D1OutlineButton extends StatelessWidget {
+  const _D1OutlineButton({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFF5F5F5).withValues(alpha: 0.25)),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: GoogleFonts.spaceGrotesk(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFFF5F5F5),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaybackWaveformPainter extends CustomPainter {
+  final List<double> bars;
+  final double progress;
+  final Color played;
+  final Color unplayed;
+
+  const _PlaybackWaveformPainter({
+    required this.bars,
+    required this.progress,
+    required this.played,
+    required this.unplayed,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (bars.isEmpty) return;
+    final count     = bars.length;
+    const gap       = 2.0;
+    final barWidth  = (size.width - (count - 1) * gap) / count;
+    final progressX = size.width * progress;
+
+    for (var i = 0; i < count; i++) {
+      final x   = i * (barWidth + gap);
+      final h   = max(3.0, bars[i] * size.height);
+      final top = (size.height - h) / 2;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, top, barWidth, h),
+          const Radius.circular(1.5),
+        ),
+        Paint()..color = x + barWidth <= progressX ? played : unplayed,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PlaybackWaveformPainter old) =>
+      old.progress != progress || old.played != played;
 }

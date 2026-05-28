@@ -8,12 +8,8 @@ const path = require("path");
 const storage_1 = require("firebase-functions/v2/storage");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
-const params_1 = require("firebase-functions/params");
 const genai_1 = require("@google/genai");
 admin.initializeApp();
-// Store your Gemini API key in Google Cloud Secret Manager:
-//   firebase functions:secrets:set GEMINI_API_KEY
-const geminiApiKey = (0, params_1.defineSecret)("GEMINI_API_KEY");
 // Used to validate whether a client-supplied responseId can be trusted.
 const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const safetySettings = [
@@ -39,8 +35,8 @@ const ALLOWED_REGIONS = ["Northern Europe", "Western Europe", "Southern Europe",
 // Routes on filename prefix:
 //   onboarding_* → bot-detection verification flow
 //   everything else → sentiment analysis flow
-exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey], bucket: "stewyrt-11.firebasestorage.app" }, async (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k;
+exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ bucket: "stewyrt-11.firebasestorage.app" }, async (event) => {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l;
     const filePath = event.data.name;
     // Only process uploads into audio_uploads/
     if (!filePath || !filePath.startsWith("audio_uploads/"))
@@ -71,7 +67,7 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
                 windowStart = prevWin;
             }
         }
-        if (attemptCount >= 5) {
+        if (attemptCount >= 3) {
             console.warn(`[STEWYRT] Verification rate limit hit for uid: ${uuid}`);
             if (fs.existsSync(tempFilePath))
                 fs.unlinkSync(tempFilePath);
@@ -95,7 +91,7 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
         let detection = null;
         try {
             const base64Audio = fs.readFileSync(tempFilePath).toString("base64");
-            const ai = new genai_1.GoogleGenAI({ apiKey: geminiApiKey.value() });
+            const ai = new genai_1.GoogleGenAI({ vertexai: true, project: "stewyrt-11", location: "us-central1" });
             const result = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
                 contents: [
@@ -173,8 +169,11 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
         // 1.5 — Rate limiting: attempt to derive UID from available signals.
         // "owner" metadata is not currently set by the client. In production mode,
         // responseId = {uid}_{pollId}, from which the UID can be extracted.
-        // Falls back to null in beta mode (UUID v4 responseId) — rate limiting is skipped.
-        const rateUid = extractUidForRateLimit(rawResponseId);
+        // In beta mode, we now derive the UID from the Firebase Auth context.
+        const rateUid = extractUidForRateLimit(rawResponseId) || ((_k = event.auth) === null || _k === void 0 ? void 0 : _k.uid);
+        if (!rateUid) {
+            console.warn("[STEWYRT] No auth context available — skipping rate limiting and proceeding");
+        }
         if (rateUid) {
             const oneHourAgo = admin.firestore.Timestamp.fromDate(new Date(Date.now() - 60 * 60 * 1000));
             const countSnap = await db
@@ -183,7 +182,7 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
                 .where("createdAt", ">", oneHourAgo)
                 .count()
                 .get();
-            if (countSnap.data().count >= 30) {
+            if (countSnap.data().count >= 5) {
                 console.warn(`[STEWYRT] Rate limit hit for uid: ${rateUid}`);
                 if (fs.existsSync(tempFilePath))
                     fs.unlinkSync(tempFilePath);
@@ -212,7 +211,7 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
         let analysis;
         try {
             const base64Audio = fs.readFileSync(tempFilePath).toString("base64");
-            const ai = new genai_1.GoogleGenAI({ apiKey: geminiApiKey.value() });
+            const ai = new genai_1.GoogleGenAI({ vertexai: true, project: "stewyrt-11", location: "us-central1" });
             const result = await ai.models.generateContent({
                 model: "gemini-2.5-flash",
                 contents: [
@@ -265,7 +264,7 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
                     safetySettings,
                 },
             });
-            const raw = ((_k = result.text) !== null && _k !== void 0 ? _k : "").trim();
+            const raw = ((_l = result.text) !== null && _l !== void 0 ? _l : "").trim();
             const json = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
             analysis = JSON.parse(json);
             if (analysis.blocked === true) {
@@ -284,6 +283,12 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ secrets: [geminiApiKey
             console.error("Content blocked or Gemini analysis failed:", err);
             if (fs.existsSync(tempFilePath))
                 fs.unlinkSync(tempFilePath);
+            await db.collection("responses").doc(trustedResponseId).set({
+                blocked: true,
+                blockedReason: "analysis_error",
+                error: true,
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
             return;
         }
         if (fs.existsSync(tempFilePath))

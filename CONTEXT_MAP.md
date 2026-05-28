@@ -226,7 +226,7 @@ Open in any browser at `http://localhost:8080`.
 | `tone` | String | Single emotion word (e.g. "Furious") |
 | `flavor` | String | Nuance word (e.g. "Bitter") |
 | `essence` | String | Philosophical adjective (e.g. "Resigned") |
-| `summary` | String | 3–4 word content headline |
+| `summary` | String | 3–4 word content headline (written in speaker's original language) |
 | `analysis_chain` | String | Gemini reasoning chain |
 | `anatomicalRegion` | String | Brain region: `Prefrontal` / `Amygdala` / `Nucleus` / `Insula` |
 | `toneRegion` | String | Mirror of `anatomicalRegion` — used by Flutter aggregator for tone word |
@@ -236,8 +236,8 @@ Open in any browser at `http://localhost:8080`.
 | `pollId` | String | Parent poll document ID |
 | `language` | String | ISO 639-1 code detected by Gemini (e.g. `"en"`, `"es"`, `"fr"`); defaults to `"en"` |
 | `blocked` | Boolean | Always present: `false` for approved, `true` if moderation triggered. **Never absent** — required for Firestore `isEqualTo: false` queries. |
-| `blockedReason` | String | e.g. `"content_policy"` (only on blocked docs) |
-| `uid` | String | Firebase Auth UID (present when derivable from responseId) |
+| `blockedReason` | String | e.g. `"content_policy"`, `"rate_limit"`, `"analysis_error"` (only on blocked docs) |
+| `uid` | String | Firebase Auth UID (present when derivable from responseId or auth context) |
 | `createdAt` | Timestamp | Server timestamp |
 
 **Note:** All three `*Region` fields carry the same value as `anatomicalRegion`. The Flutter aggregator votes across many responses per question to find the dominant region for each recurring emotion word.
@@ -266,12 +266,12 @@ Open in any browser at `http://localhost:8080`.
 | `durationSeconds` | Number | Audio duration in seconds |
 | `verificationNote` | String | 1-sentence Gemini explanation |
 | `verifiedAt` | Timestamp | When verification completed |
-| `verificationAttempts` | Number | Count of verification attempts in the current 24h window |
+| `verificationAttempts` | Number | Count of verification attempts in the current 24h window (limit 3) |
 | `verificationWindowStart` | Timestamp | Start of the current 24h rate-limit window |
 | `selfReportedAge` | String | Self-reported age group (e.g. `"25-34"`) |
 | `selfReportedGender` | String | Self-reported gender (e.g. `"Female"`) |
-| `selfReportedEthnicity` | String | Self-reported ethnicity |
-| `selfReportedRegion` | String | Self-reported UN subregion (e.g. `"Northern Europe"`) |
+| `selfReportedEthnicity` | String | Self-reported ONS-style ethnicity code (e.g. `"White_British"`) |
+| `selfReportedRegion` | String | Self-reported region (e.g. `"Northern Europe"`) |
 | `selfReportedAt` | Timestamp | When demographics were submitted |
 
 Demographics are **self-reported** only — never inferred from voice. Written by `submitSelfReportedDemographics` CF after verification completes (note: CF receives `age/gender/ethnicity/region` as param names; stores them with `selfReported*` prefix). All writes are Admin SDK only; no client writes permitted.
@@ -454,22 +454,19 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 
 **Sentiment flow:**
 1. Validate `responseId` (UUID v4 regex) and `pollId` (Firestore existence check)
-2. Rate-limit: count responses from same UID in past hour via `count()` aggregation; reject if ≥ 30 (skipped in beta mode where responseId is UUID v4 — no reliable UID available)
-3. Download file to `/tmp/`, base64-encode, send to `gemini-2.5-flash`
+2. Rate-limit: Attempt to derive UID from `responseId` (production) or Firebase Auth context (beta). Count responses from same UID in past hour; reject if ≥ 5.
+3. Download file to `/tmp/`, base64-encode, send to Vertex AI (Gemini 2.5 Flash)
 4. Content moderation check — if blocked, write `{ blocked: true, blockedReason: "content_policy" }` and exit
 5. Run Firestore transaction: write full analysis to `responses/{responseId}` with `blocked: false`; increment `polls/{pollId}` counters
 6. Delete temp file
 
 **Gemini prompt steps (sentiment):**
-1. `tone` — single-word overarching emotional state
-2. `flavor` — single-word nuance of that tone
-3. `essence` — single-word philosophical adjective
-4. `summary` — 3–4 word content headline (what they argued, not how they felt)
-5. `anatomicalRegion` — exactly one of `"Prefrontal"` / `"Amygdala"` / `"Nucleus"` / `"Insula"`:
-   - **Prefrontal:** complex, societal, reflective thought — irony, disillusionment, curiosity, conflict
-   - **Amygdala:** primal, intense emotions — fury, panic, fear, defeat, desperation
-   - **Nucleus:** reward, hope, joy, inspiration, gratitude, positive motivation
-   - **Insula:** disgust, numbness, deep melancholy, alienation, visceral unease
+1. `tone` — single-word overarching emotional state (English)
+2. `flavor` — single-word nuance of that tone (English)
+3. `essence` — single-word philosophical adjective (English)
+4. `summary` — 3–4 word content headline (written in speaker's original language)
+5. `anatomicalRegion` — exactly one of `"Prefrontal"` / `"Amygdala"` / `"Nucleus"` / `"Insula"`
+6. `language` — ISO 639-1 code
 
 **Bot Detection (Verification) flow:**
 1. Same audio ingest
@@ -478,7 +475,7 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 4. Delete audio from bucket immediately — `finally` block guarantees deletion on success and error
 5. Write `{ verifiedAsHuman, isContinuousSpeech, durationSeconds, verificationNote, verifiedAt, verificationAttempts, verificationWindowStart }` to `users/{uid}`
 
-**Secret:** `GEMINI_API_KEY` in Google Cloud Secret Manager
+**Billing:** Gemini via Vertex AI (Google Cloud Project: `stewyrt-11`, location: `us-central1`). No direct API key usage.
 
 ---
 
@@ -525,14 +522,14 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 
 **Logic:**
 1. Require authenticated caller (`request.auth`)
-2. Validate `age`, `gender`, `ethnicity`, `region` against constrained `ALLOWED_*` arrays (Title Case)
+2. Validate `age`, `gender`, `ethnicity`, `region` against constrained `ALLOWED_*` arrays
 3. Write with `merge: true` to `users/{uid}`
 
 **ALLOWED arrays:**
 - Ages: `"18-24"` through `"65+"` + `"Prefer not to say"`
 - Genders: `Male`, `Female`, `Non-Binary`, `Prefer not to say`
-- Ethnicities: `Asian`, `Black or African`, `Hispanic/Latino`, `White`, `Mixed`, `Other`, `Prefer not to say`
-- Regions: 13 UN geoscheme subregions (Northern/Western/Southern/Eastern Europe, North America, Latin America, MENA, Sub-Saharan Africa, South/East/Southeast Asia, Oceania) + `Prefer not to say`
+- Ethnicities: ONS-style codes (e.g. `White_British`, `Asian_Indian`, `prefer_not_to_say`)
+- Regions: 13 regions including `Middle East & North Africa`, `North America`, etc. + `Prefer not to say`
 
 ---
 

@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-05-25] — Feat: add recording preview to Day One ice breaker screen
+
+### Flutter Client
+- **`lib/screens/day_one_screen.dart`**: Implemented a recording preview state matching the `RecordingSheet` pattern. Users can now play back their ice breaker recording, re-record if needed, or confirm and submit. Added `just_audio` integration, playback waveform visualization, and a dedicated preview UI.
+
+---
+
 ## [2026-05-25] — Fix: skip rate limit on missing auth context, add sentiment error handling to prevent client hang
 
 ### Cloud Functions (`functions/src/index.ts`)
