@@ -150,8 +150,8 @@ buildTypes {
 `_screens` uses `const ResonanceScreen()` for both platforms. The routing happens inside `resonance_screen.dart` via a conditional import — **not** via `kIsWeb` in `main.dart`.
 
 Bottom nav is responsive on viewport width:
-- **≥ 600px:** three tabs + `Positioned` settings icon (left) + `Positioned` theme toggle icon (right) in a `Stack`. No change from original layout.
-- **< 600px:** a slim 40px `AppBar` added to the `Scaffold` with settings icon (leading) and theme toggle (actions); bottom nav shows the three tabs only, centered — no `Stack`, no overlap.
+- **≥ 600px:** three tabs + `Positioned` settings icon (left) in a `Stack`.
+- **< 600px:** a slim 40px `AppBar` added to the `Scaffold` with settings icon (leading); bottom nav shows the three tabs only, centered — no `Stack`, no overlap.
 
 Tab 0 ("Stewyrt") uses a Space Grotesk bold 'S' text widget as its icon (via optional `iconWidget` on `_NavItem`). The other two tabs use `IconData`.
 
@@ -815,7 +815,7 @@ window.addEventListener('message', e => { processBrainData(typeof e.data === 'st
 | Background | `#000000` | `#FFFFFF` |
 | Surface | `#0A0A0A` | `#F5F5F5` |
 | Primary text | `#F5F5F5` | `#000000` |
-| Subtext | `#AAAAAA` | `#555555` |
+| Subtext | `#888888` | `#666666` |
 | Border/divider | `#1A1A1A` | `#EEEEEE` |
 
 **Font:** `GoogleFonts.spaceGrotesk` at all weights. `TextTheme` defines `displayLarge` (32/700), `displayMedium` (24/600), `bodyLarge` (16/400), `bodyMedium` (14/400 secondary), `labelLarge` (14/600).

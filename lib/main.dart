@@ -33,11 +33,8 @@ class _TightBouncingPhysics extends BouncingScrollPhysics {
       _TightBouncingPhysics(parent: buildParent(ancestor));
 
   @override
-  SpringDescription get spring => const SpringDescription(
-    mass: 0.5,
-    stiffness: 500.0,
-    damping: 24.0,
-  );
+  SpringDescription get spring =>
+      const SpringDescription(mass: 0.5, stiffness: 500.0, damping: 24.0);
 }
 
 class _BouncingScrollBehavior extends ScrollBehavior {
@@ -47,8 +44,10 @@ class _BouncingScrollBehavior extends ScrollBehavior {
 
   @override
   Widget buildOverscrollIndicator(
-          BuildContext context, Widget child, ScrollableDetails details) =>
-      child;
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) => child;
 
   @override
   Set<PointerDeviceKind> get dragDevices => kIsWeb
@@ -116,7 +115,7 @@ class _RootShellState extends State<RootShell> {
     final textColor = isDark
         ? const Color(0xFFF5F5F5)
         : const Color(0xFF000000);
-    final subColor = isDark ? const Color(0xFF555555) : const Color(0xFFAAAAAA);
+    final subColor = isDark ? const Color(0xFF888888) : const Color(0xFF666666);
     final borderColor = isDark
         ? const Color(0xFF1A1A1A)
         : const Color(0xFFEEEEEE);
@@ -177,25 +176,20 @@ class _RootShellState extends State<RootShell> {
                     children: [
                       GestureDetector(
                         onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsScreen(),
+                          ),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(Icons.settings_outlined, color: subColor, size: 20),
-                        ),
-                      ),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: themeNotifier.toggle,
                         child: Padding(
                           padding: const EdgeInsets.all(12),
                           child: Icon(
-                            isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                            Icons.settings_outlined,
                             color: subColor,
                             size: 20,
                           ),
                         ),
                       ),
+                      const Spacer(),
                     ],
                   ),
                 ),
@@ -220,22 +214,14 @@ class _RootShellState extends State<RootShell> {
                         left: 4,
                         child: GestureDetector(
                           onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                            MaterialPageRoute(
+                              builder: (_) => const SettingsScreen(),
+                            ),
                           ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Icon(Icons.settings_outlined, color: subColor, size: 20),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: themeNotifier.toggle,
                           child: Padding(
                             padding: const EdgeInsets.all(12),
                             child: Icon(
-                              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+                              Icons.settings_outlined,
                               color: subColor,
                               size: 20,
                             ),

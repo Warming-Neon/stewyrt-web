@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-02] — Fix: UI improvements and navigation safety
+
+- **`lib/main.dart`**: Removed duplicate theme toggles from mobile toolbar and wide navigation bar to centralize control in Settings.
+- **`lib/main.dart`**: Raised `subColor` contrast to meet WCAG standards (#555555 -> #888888 in dark mode; #AAAAAA -> #666666 in light mode).
+- **`lib/screens/settings_screen.dart`**: Added confirmation dialog to `_openUrl` before launching external browser links for legal and support pages.
+
+---
+
 ## [2026-05-25] — Feat: add recording preview to Day One ice breaker screen
 
 ### Flutter Client

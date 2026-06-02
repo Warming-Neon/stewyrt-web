@@ -33,18 +33,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     final v = info.version.isNotEmpty ? info.version : '';
     final b = info.buildNumber.isNotEmpty ? info.buildNumber : '';
-    setState(() => _version = [if (v.isNotEmpty) v, if (b.isNotEmpty) '($b)'].join(' '));
+    setState(
+      () =>
+          _version = [if (v.isNotEmpty) v, if (b.isNotEmpty) '($b)'].join(' '),
+    );
   }
 
   Future<void> _openUrl(String url) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? const Color(0xFFF5F5F5) : Colors.black;
+    final sub = isDark ? const Color(0xFF666666) : const Color(0xFF999999);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
+        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+        title: Text(
+          'Leaving Stewyrt',
+          style: GoogleFonts.spaceGrotesk(
+            color: fg,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'This will open in your browser.',
+          style: GoogleFonts.spaceGrotesk(
+            color: sub,
+            fontSize: 14,
+            height: 1.6,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Cancel', style: GoogleFonts.spaceGrotesk(color: sub)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Continue',
+              style: GoogleFonts.spaceGrotesk(
+                color: fg,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       debugPrint('[STEWYRT][SETTINGS] Could not launch $url');
     }
   }
 
-  Future<void> _confirmAndDeleteData(BuildContext context, bool isDark, Color fg) async {
-    final nav       = Navigator.of(context);
+  Future<void> _confirmAndDeleteData(
+    BuildContext context,
+    bool isDark,
+    Color fg,
+  ) async {
+    final nav = Navigator.of(context);
     final messenger = ScaffoldMessenger.of(context);
 
     final confirmed = await showDialog<bool>(
@@ -54,7 +106,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         title: Text(
           'Delete your data?',
-          style: GoogleFonts.spaceGrotesk(color: fg, fontWeight: FontWeight.w600),
+          style: GoogleFonts.spaceGrotesk(
+            color: fg,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Text(
           'This permanently deletes all your responses and account data. This cannot be undone.',
@@ -70,7 +125,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Text(
               'Cancel',
               style: GoogleFonts.spaceGrotesk(
-                color: isDark ? const Color(0xFFAAAAAA) : const Color(0xFF666666),
+                color: isDark
+                    ? const Color(0xFFAAAAAA)
+                    : const Color(0xFF666666),
               ),
             ),
           ),
@@ -113,7 +170,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
           content: Text(
             'Failed to delete data — please try again.',
-            style: GoogleFonts.spaceGrotesk(fontSize: 13, color: const Color(0xFFF5F5F5)),
+            style: GoogleFonts.spaceGrotesk(
+              fontSize: 13,
+              color: const Color(0xFFF5F5F5),
+            ),
           ),
         ),
       );
@@ -122,11 +182,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark        = Theme.of(context).brightness == Brightness.dark;
-    final bg            = isDark ? Colors.black : Colors.white;
-    final fg            = isDark ? const Color(0xFFF5F5F5) : Colors.black;
-    final sub           = isDark ? const Color(0xFF666666) : const Color(0xFF999999);
-    final border        = isDark ? const Color(0xFF1A1A1A) : const Color(0xFFEEEEEE);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? Colors.black : Colors.white;
+    final fg = isDark ? const Color(0xFFF5F5F5) : Colors.black;
+    final sub = isDark ? const Color(0xFF666666) : const Color(0xFF999999);
+    final border = isDark ? const Color(0xFF1A1A1A) : const Color(0xFFEEEEEE);
     final themeNotifier = context.watch<ThemeNotifier>();
 
     return Scaffold(
@@ -144,7 +204,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: Text(
           'Settings',
-          style: GoogleFonts.spaceGrotesk(color: fg, fontWeight: FontWeight.w600),
+          style: GoogleFonts.spaceGrotesk(
+            color: fg,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ),
       body: _deletingData
@@ -152,10 +215,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  CircularProgressIndicator(
-                    strokeWidth: 1.5,
-                    color: fg,
-                  ),
+                  CircularProgressIndicator(strokeWidth: 1.5, color: fg),
                   const SizedBox(height: 20),
                   Text(
                     'Deleting your data...',
@@ -180,45 +240,63 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SectionHeader('LEGAL', sub),
                 _TapRow(
                   label: 'Terms of Service',
-                  fg: fg, sub: sub, border: border,
+                  fg: fg,
+                  sub: sub,
+                  border: border,
                   onTap: () => _openUrl('https://stewyrt.com/terms.html'),
                 ),
                 _TapRow(
                   label: 'Privacy Policy',
-                  fg: fg, sub: sub, border: border,
+                  fg: fg,
+                  sub: sub,
+                  border: border,
                   onTap: () => _openUrl('https://stewyrt.com/privacy.html'),
                 ),
                 _TapRow(
                   label: 'Child Safety Policy',
-                  fg: fg, sub: sub, border: border,
-                  onTap: () => _openUrl('https://stewyrt.com/child-safety.html'),
+                  fg: fg,
+                  sub: sub,
+                  border: border,
+                  onTap: () =>
+                      _openUrl('https://stewyrt.com/child-safety.html'),
                 ),
                 _SectionHeader('SUPPORT', sub),
                 _TapRow(
                   label: 'Contact Support',
-                  fg: fg, sub: sub, border: border,
+                  fg: fg,
+                  sub: sub,
+                  border: border,
                   onTap: () => _openUrl('mailto:support@stewyrt.com'),
                 ),
                 _TapRow(
                   label: 'FAQ',
-                  fg: fg, sub: sub, border: border,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const FaqScreen()),
-                  ),
+                  fg: fg,
+                  sub: sub,
+                  border: border,
+                  onTap: () => Navigator.of(
+                    context,
+                  ).push(MaterialPageRoute(builder: (_) => const FaqScreen())),
                 ),
                 _SectionHeader('ABOUT', sub),
                 _TapRow(
                   label: 'About Stewyrt',
-                  fg: fg, sub: sub, border: border,
+                  fg: fg,
+                  sub: sub,
+                  border: border,
                   onTap: () => showDialog<void>(
                     context: context,
                     builder: (_) => AlertDialog(
-                      backgroundColor: isDark ? const Color(0xFF1A1A1A) : Colors.white,
-                      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                      backgroundColor: isDark
+                          ? const Color(0xFF1A1A1A)
+                          : Colors.white,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.zero,
+                      ),
                       title: Text(
                         'About Stewyrt',
                         style: GoogleFonts.spaceGrotesk(
-                          color: fg, fontWeight: FontWeight.w600,
+                          color: fg,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       content: Text(
@@ -232,7 +310,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         'Supported by Google for Startups.\n\n'
                         'Version $_version',
                         style: GoogleFonts.spaceGrotesk(
-                          color: sub, fontSize: 14, height: 1.6,
+                          color: sub,
+                          fontSize: 14,
+                          height: 1.6,
                         ),
                       ),
                       actions: [
@@ -240,7 +320,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: () => Navigator.of(context).pop(),
                           child: Text(
                             'OK',
-                            style: GoogleFonts.spaceGrotesk(color: fg, fontWeight: FontWeight.w600),
+                            style: GoogleFonts.spaceGrotesk(
+                              color: fg,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -250,7 +333,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SectionHeader('ACCOUNT', sub),
                 _TapRow(
                   label: 'Delete My Data',
-                  fg: Colors.redAccent, sub: sub, border: border,
+                  fg: Colors.redAccent,
+                  sub: sub,
+                  border: border,
                   showChevron: false,
                   onTap: () {
                     HapticFeedback.mediumImpact();
