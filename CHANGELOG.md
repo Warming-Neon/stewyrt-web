@@ -5,6 +5,12 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-03] — Fix: add intentionality check to sentiment analysis
+
+- **`functions/src/index.ts`**: Added an `INTENTIONALITY CHECK` to the Gemini sentiment analysis prompt. This filters out accidental recordings, silence, and ambient noise (traffic, wind, room tone) before processing, ensuring only purposeful audio content is analyzed and stored.
+
+---
+
 ## [2026-06-02] — Fix: UI improvements and navigation safety
 
 - **`lib/main.dart`**: Removed duplicate theme toggles from mobile toolbar and wide navigation bar to centralize control in Settings.

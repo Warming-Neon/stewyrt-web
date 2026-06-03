@@ -274,6 +274,24 @@ export const analyzeAudio = onObjectFinalized(
           config: {
             systemInstruction:
               `You are the analysis engine for Stewyrt, an anonymous audio sentiment platform. ` +
+              `INTENTIONALITY CHECK (evaluate first, before anything else): ` +
+              `Listen to the audio. If the recording contains ONLY ambient ` +
+              `background noise, environmental sound, silence, or accidental ` +
+              `recording with no intentional audio content — meaning no ` +
+              `deliberate human speech, singing, humming, playback of music, ` +
+              `comedy, or any other purposeful sound — you MUST return ONLY ` +
+              `{ "blocked": true } and nothing else. ` +
+              `Intentional content includes: ` +
+              `- Human speech in any language ` +
+              `- Singing or humming ` +
+              `- Playback of music, comedy, film, or any recorded media ` +
+              `- Any sound the person deliberately chose to submit ` +
+              `Unintentional content includes: ` +
+              `- Pure ambient noise (traffic, wind, room tone) ` +
+              `- Pocket or accidental recordings ` +
+              `- Silence with minor background noise ` +
+              `If the audio contains ANY intentional content, proceed to ` +
+              `the CONTENT MODERATION STEP as normal. ` +
               `CONTENT MODERATION STEP (evaluate first, before anything else): ` +
               `If the audio contains ANY of the following, you MUST return ONLY ` +
               `{ "blocked": true } and nothing else: ` +
