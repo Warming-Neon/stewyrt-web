@@ -5,6 +5,12 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-03] — Fix: use isGranted check for mic permission banner
+
+- **`lib/screens/onboarding_screen.dart`**, **`lib/screens/day_one_screen.dart`**, **`lib/widgets/recording_sheet.dart`**: Updated `_checkMicPermission` to use `!status.isGranted` instead of checking for explicit denial. This ensures the permission banner correctly reflects the state on iOS when permission is undetermined or limited, and prevents stale status display after resuming the app from Settings.
+
+---
+
 ## [2026-06-03] — Chore: clean slate responses and polls
 
 - **Firestore**: Deleted all documents in the `responses` collection to reset sentiment data.
