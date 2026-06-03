@@ -204,10 +204,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      debugPrint('[MIC DEBUG] App resumed — calling _checkMicPermission');
-      _checkMicPermission();
-    }
+    if (state == AppLifecycleState.resumed) _checkMicPermission();
   }
 
   Future<void> _fetchVerificationPrompt() async {

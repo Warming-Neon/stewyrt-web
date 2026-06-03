@@ -5,6 +5,12 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-03] — Chore: remove mic permission debug logging
+
+- **`lib/screens/onboarding_screen.dart`**: Removed temporary `debugPrint` statements added for mic permission diagnostics.
+
+---
+
 ## [2026-06-03] — Debug: add mic permission logging to onboarding screen
 
 - **`lib/screens/onboarding_screen.dart`**: Added temporary `debugPrint` statements to `initState`, `_checkMicPermission`, and `didChangeAppLifecycleState` to trace microphone permission status and state transitions.
