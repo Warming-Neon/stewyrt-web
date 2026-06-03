@@ -5,6 +5,12 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-03] — Debug: add mic permission logging to onboarding screen
+
+- **`lib/screens/onboarding_screen.dart`**: Added temporary `debugPrint` statements to `initState`, `_checkMicPermission`, and `didChangeAppLifecycleState` to trace microphone permission status and state transitions.
+
+---
+
 ## [2026-06-03] — Fix: use isGranted check for mic permission banner
 
 - **`lib/screens/onboarding_screen.dart`**, **`lib/screens/day_one_screen.dart`**, **`lib/widgets/recording_sheet.dart`**: Updated `_checkMicPermission` to use `!status.isGranted` instead of checking for explicit denial. This ensures the permission banner correctly reflects the state on iOS when permission is undetermined or limited, and prevents stale status display after resuming the app from Settings.

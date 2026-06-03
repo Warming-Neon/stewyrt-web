@@ -75,7 +75,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   static const int _maxVerificationAttempts = 5;
   static const String _prefAttemptCount = 'verificationAttemptCount';
-  static const String _prefWindowStart  = 'verificationWindowStart';
+  static const String _prefWindowStart = 'verificationWindowStart';
 
   // ── Verifying waiting room ─────────────────────────────────────────────────
   static const _phrases = [
@@ -96,31 +96,39 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   late final Animation<double> _shakeAnimation;
 
   // Dropdown options — values are passed verbatim to submitSelfReportedDemographics.
-  static const _ages = ['18-24', '25-34', '35-44', '45-54', '55-64', '65+', 'Prefer not to say'];
+  static const _ages = [
+    '18-24',
+    '25-34',
+    '35-44',
+    '45-54',
+    '55-64',
+    '65+',
+    'Prefer not to say',
+  ];
   static const _genders = ['Male', 'Female', 'Non-Binary', 'Prefer not to say'];
   // ONS 2021 Census categories. Display strings stored as selfReportedEthnicity;
   // codes stored as selfReportedEthnicityCode. Custom typed values get 'other_unlisted'.
   static const Map<String, String> _onsCodeMap = {
     'English, Welsh, Scottish, Northern Irish or British': 'White_British',
-    'Irish':                                               'White_Irish',
-    'Gypsy or Irish Traveller':                            'White_Gypsy_Irish_Traveller',
-    'Roma':                                                'White_Roma',
-    'Any other White background':                          'White_Other',
-    'White and Black Caribbean':                           'Mixed_White_Black_Caribbean',
-    'White and Black African':                             'Mixed_White_Black_African',
-    'White and Asian':                                     'Mixed_White_Asian',
-    'Any other Mixed or Multiple background':              'Mixed_Other',
-    'Indian':                                              'Asian_Indian',
-    'Pakistani':                                           'Asian_Pakistani',
-    'Bangladeshi':                                         'Asian_Bangladeshi',
-    'Chinese':                                             'Asian_Chinese',
-    'Any other Asian background':                          'Asian_Other',
-    'African':                                             'Black_African',
-    'Caribbean':                                           'Black_Caribbean',
-    'Any other Black, African or Caribbean background':    'Black_Other',
-    'Arab':                                                'Other_Arab',
-    'Any other ethnic group':                              'Other_Other',
-    'Prefer not to say':                                   'prefer_not_to_say',
+    'Irish': 'White_Irish',
+    'Gypsy or Irish Traveller': 'White_Gypsy_Irish_Traveller',
+    'Roma': 'White_Roma',
+    'Any other White background': 'White_Other',
+    'White and Black Caribbean': 'Mixed_White_Black_Caribbean',
+    'White and Black African': 'Mixed_White_Black_African',
+    'White and Asian': 'Mixed_White_Asian',
+    'Any other Mixed or Multiple background': 'Mixed_Other',
+    'Indian': 'Asian_Indian',
+    'Pakistani': 'Asian_Pakistani',
+    'Bangladeshi': 'Asian_Bangladeshi',
+    'Chinese': 'Asian_Chinese',
+    'Any other Asian background': 'Asian_Other',
+    'African': 'Black_African',
+    'Caribbean': 'Black_Caribbean',
+    'Any other Black, African or Caribbean background': 'Black_Other',
+    'Arab': 'Other_Arab',
+    'Any other ethnic group': 'Other_Other',
+    'Prefer not to say': 'prefer_not_to_say',
   };
   static const _regions = [
     'Northern Europe',
@@ -151,16 +159,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 420),
     );
-    _shakeAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -10.0), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: -10.0, end: 10.0), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: 10.0, end: -8.0), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: -8.0, end: 8.0), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: 8.0, end: 0.0), weight: 1),
-    ]).animate(CurvedAnimation(parent: _shakeController, curve: Curves.easeOut));
+    _shakeAnimation = TweenSequence<double>(
+      [
+        TweenSequenceItem(tween: Tween(begin: 0.0, end: -10.0), weight: 1),
+        TweenSequenceItem(tween: Tween(begin: -10.0, end: 10.0), weight: 2),
+        TweenSequenceItem(tween: Tween(begin: 10.0, end: -8.0), weight: 2),
+        TweenSequenceItem(tween: Tween(begin: -8.0, end: 8.0), weight: 2),
+        TweenSequenceItem(tween: Tween(begin: 8.0, end: 0.0), weight: 1),
+      ],
+    ).animate(CurvedAnimation(parent: _shakeController, curve: Curves.easeOut));
 
     WidgetsBinding.instance.addObserver(this);
     _checkMicPermission();
+    debugPrint('[MIC DEBUG] initState: _checkMicPermission called');
     _fetchVerificationPrompt();
   }
 
@@ -181,13 +192,22 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _checkMicPermission() async {
     if (kIsWeb) return;
     final status = await Permission.microphone.status;
+    debugPrint(
+      '[MIC DEBUG] status: $status | isGranted: ${status.isGranted} | isDenied: ${status.isDenied} | isPermanentlyDenied: ${status.isPermanentlyDenied} | isRestricted: ${status.isRestricted}',
+    );
     if (!mounted) return;
     setState(() => _micPermissionDenied = !status.isGranted);
+    debugPrint(
+      '[MIC DEBUG] _micPermissionDenied set to: $_micPermissionDenied',
+    );
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) _checkMicPermission();
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('[MIC DEBUG] App resumed — calling _checkMicPermission');
+      _checkMicPermission();
+    }
   }
 
   Future<void> _fetchVerificationPrompt() async {
@@ -197,10 +217,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           .where('active', isEqualTo: true)
           .get();
       if (snap.docs.isEmpty || !mounted) return;
-      final text = snap.docs[Random().nextInt(snap.docs.length)].data()['text'] as String?;
-      if (text != null && text.isNotEmpty) setState(() => _verificationPrompt = text);
+      final text =
+          snap.docs[Random().nextInt(snap.docs.length)].data()['text']
+              as String?;
+      if (text != null && text.isNotEmpty)
+        setState(() => _verificationPrompt = text);
     } catch (e) {
-      debugPrint('[STEWYRT][ONBOARDING] Failed to fetch verification prompt: $e');
+      debugPrint(
+        '[STEWYRT][ONBOARDING] Failed to fetch verification prompt: $e',
+      );
     }
   }
 
@@ -230,9 +255,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _incrementAttemptCount() async {
     final prefs = await SharedPreferences.getInstance();
     final windowStart = prefs.getInt(_prefWindowStart) ?? 0;
-    final count       = prefs.getInt(_prefAttemptCount) ?? 0;
-    final now         = DateTime.now().millisecondsSinceEpoch;
-    const window      = 24 * 60 * 60 * 1000;
+    final count = prefs.getInt(_prefAttemptCount) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    const window = 24 * 60 * 60 * 1000;
     if (now - windowStart > window) {
       await prefs.setInt(_prefWindowStart, now);
       await prefs.setInt(_prefAttemptCount, 1);
@@ -244,11 +269,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<int> _computeAttemptsRemaining() async {
     final prefs = await SharedPreferences.getInstance();
     final windowStart = prefs.getInt(_prefWindowStart) ?? 0;
-    final count       = prefs.getInt(_prefAttemptCount) ?? 0;
-    final now         = DateTime.now().millisecondsSinceEpoch;
-    const window      = 24 * 60 * 60 * 1000;
+    final count = prefs.getInt(_prefAttemptCount) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    const window = 24 * 60 * 60 * 1000;
     if (now - windowStart > window) return _maxVerificationAttempts;
-    return (_maxVerificationAttempts - count).clamp(0, _maxVerificationAttempts);
+    return (_maxVerificationAttempts - count).clamp(
+      0,
+      _maxVerificationAttempts,
+    );
   }
 
   // ── Error feedback ────────────────────────────────────────────────────────
@@ -280,10 +308,17 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     // If it's false the user denied in Settings after the initial prompt.
     if (!hasPermission) {
       _pressActive = false;
-      if (mounted) setState(() { _isRecording = false; _micPermissionDenied = true; });
+      if (mounted)
+        setState(() {
+          _isRecording = false;
+          _micPermissionDenied = true;
+        });
       return;
     }
-    if (!mounted) { _pressActive = false; return; }
+    if (!mounted) {
+      _pressActive = false;
+      return;
+    }
 
     final filePath = kIsWeb
         ? ''
@@ -319,16 +354,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     _ampSub = _recorder
         .onAmplitudeChanged(const Duration(milliseconds: 50))
         .listen((amp) {
-      if (!mounted) return;
-      setState(() {
-        _rawAmplitudes.add(kIsWeb
-            ? SoftLimiter.webProcess(amp.current)
-            : amp.current);
-        _liveSamples.add(kIsWeb
-            ? SoftLimiter.webProcess(amp.current)
-            : _limiter.process(amp.current));
-      });
-    });
+          if (!mounted) return;
+          setState(() {
+            _rawAmplitudes.add(
+              kIsWeb ? SoftLimiter.webProcess(amp.current) : amp.current,
+            );
+            _liveSamples.add(
+              kIsWeb
+                  ? SoftLimiter.webProcess(amp.current)
+                  : _limiter.process(amp.current),
+            );
+          });
+        });
 
     setState(() => _isRecording = true);
     debugPrint('[BOUNCER] Recording started');
@@ -374,9 +411,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         ? -100.0
         : _rawAmplitudes.reduce((a, b) => a + b) / _rawAmplitudes.length;
 
-    debugPrint('[BOUNCER] Quality check — duration: ${duration.inMilliseconds}ms, avg amplitude: ${avgAmp.toStringAsFixed(2)}dB');
+    debugPrint(
+      '[BOUNCER] Quality check — duration: ${duration.inMilliseconds}ms, avg amplitude: ${avgAmp.toStringAsFixed(2)}dB',
+    );
 
-    if (duration.inMilliseconds < 2000 || (kIsWeb ? avgAmp < 0.01 : avgAmp < -50.0)) {
+    if (duration.inMilliseconds < 2000 ||
+        (kIsWeb ? avgAmp < 0.01 : avgAmp < -50.0)) {
       debugPrint('[BOUNCER] ❌ Recording rejected — too short or silent');
       await _recorder.stop();
       await _recorder.dispose();
@@ -391,7 +431,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           SnackBar(
             backgroundColor: const Color(0xFF1A1A1A),
             behavior: SnackBarBehavior.floating,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
             content: Text(
               "We didn't catch anything — make sure your mic is on and give us a few seconds!",
               style: GoogleFonts.spaceGrotesk(fontSize: 13, color: _offWhite),
@@ -418,7 +460,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
 
-    debugPrint('[BOUNCER] Recording stopped — path: $recordedPath — starting upload');
+    debugPrint(
+      '[BOUNCER] Recording stopped — path: $recordedPath — starting upload',
+    );
 
     setState(() {
       _isRecording = false;
@@ -429,7 +473,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      setState(() { _isRecording = false; _liveSamples.clear(); });
+      setState(() {
+        _isRecording = false;
+        _liveSamples.clear();
+      });
       return;
     }
     final uid = user.uid;
@@ -447,7 +494,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           SnackBar(
             backgroundColor: const Color(0xFF1A1A1A),
             behavior: SnackBarBehavior.floating,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
             content: Text(
               'Upload failed — please try again.',
               style: GoogleFonts.spaceGrotesk(fontSize: 13, color: _offWhite),
@@ -464,7 +513,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
     if (!mounted) return;
 
-    debugPrint('[BOUNCER] Upload complete — attaching verification listener for uid: $uid');
+    debugPrint(
+      '[BOUNCER] Upload complete — attaching verification listener for uid: $uid',
+    );
 
     setState(() {
       _isUploading = false;
@@ -489,7 +540,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         final remaining = await _computeAttemptsRemaining();
         if (!mounted) return;
         setState(() {
-          _isVerifying    = false;
+          _isVerifying = false;
           _verifyTimedOut = true;
           _attemptsRemaining = remaining;
         });
@@ -504,11 +555,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         FirebaseFunctions.instance
             .httpsCallable('submitSelfReportedDemographics')
             .call({
-              'age':          _age,
-              'gender':       _gender,
-              'ethnicity':    _ethnicity,
+              'age': _age,
+              'gender': _gender,
+              'ethnicity': _ethnicity,
               'ethnicityCode': _ethnicityCode,
-              'region':       _region,
+              'region': _region,
             })
             .then<void>(
               (_) {},
@@ -534,7 +585,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           SnackBar(
             backgroundColor: const Color(0xFF1A1A1A),
             behavior: SnackBarBehavior.floating,
-            shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
             content: Text(
               errorMessage,
               style: GoogleFonts.spaceGrotesk(fontSize: 13, color: _offWhite),
@@ -645,7 +698,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 enabled: !_isRecording && !_isUploading,
                 onChanged: (v) => setState(() {
                   _ethnicity = v;
-                  _ethnicityCode = v != null ? (_onsCodeMap[v] ?? 'other_unlisted') : null;
+                  _ethnicityCode = v != null
+                      ? (_onsCodeMap[v] ?? 'other_unlisted')
+                      : null;
                 }),
               ),
               const SizedBox(height: 12),
@@ -676,7 +731,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ? null
                     : (v) => setState(() => _consentRecording = v),
                 label: const TextSpan(
-                  text: 'I consent to a one-time audio recording used solely to '
+                  text:
+                      'I consent to a one-time audio recording used solely to '
                       'confirm I am a real human. The recording is processed and '
                       'immediately deleted. It is NOT used to identify me or '
                       'estimate any personal characteristic.',
@@ -711,7 +767,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       recognizer: _privacyRecognizer,
                     ),
                     const TextSpan(
-                      text: ', and understand my anonymized demographic data will be aggregated and monetized.',
+                      text:
+                          ', and understand my anonymized demographic data will be aggregated and monetized.',
                     ),
                   ],
                 ),
@@ -731,7 +788,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Widget _buildHoldButton() {
     return Listener(
       onPointerDown: (_) {
-        if (_isRecording || _pressActive || _isUploading || _isVerifying) return;
+        if (_isRecording || _pressActive || _isUploading || _isVerifying)
+          return;
         if (!_isFormValid) {
           _onInvalidTap();
           return;
@@ -826,7 +884,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         children: [
           if (_micPermissionDenied) ...[
             MicPermissionBanner(
-              message: "Stewyrt needs your microphone to verify you're human. Tap to open Settings.",
+              message:
+                  "Stewyrt needs your microphone to verify you're human. Tap to open Settings.",
             ),
             const SizedBox(height: 12),
           ],
@@ -864,7 +923,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.mic_none_rounded, color: _offWhite, size: 18),
+                  const Icon(
+                    Icons.mic_none_rounded,
+                    color: _offWhite,
+                    size: 18,
+                  ),
                   const SizedBox(width: 10),
                   Text(
                     'Hold to Verify',
@@ -962,7 +1025,11 @@ class _StyledDropdown extends StatelessWidget {
             ),
             isExpanded: true,
             dropdownColor: _dropdownCanvas,
-            icon: const Icon(Icons.keyboard_arrow_down, color: _subtle, size: 18),
+            icon: const Icon(
+              Icons.keyboard_arrow_down,
+              color: _subtle,
+              size: 18,
+            ),
             style: GoogleFonts.spaceGrotesk(fontSize: 14, color: _offWhite),
             items: items
                 .map((item) => DropdownMenuItem(value: item, child: Text(item)))
@@ -1196,10 +1263,12 @@ class _EthnicitySearchFieldState extends State<_EthnicitySearchField> {
           Container(
             decoration: BoxDecoration(
               border: Border(
-                top:    const BorderSide(color: _border),
-                left:   const BorderSide(color: _border),
-                right:  const BorderSide(color: _border),
-                bottom: listVisible ? BorderSide.none : const BorderSide(color: _border),
+                top: const BorderSide(color: _border),
+                left: const BorderSide(color: _border),
+                right: const BorderSide(color: _border),
+                bottom: listVisible
+                    ? BorderSide.none
+                    : const BorderSide(color: _border),
               ),
               color: _dropdownCanvas,
             ),
@@ -1212,11 +1281,17 @@ class _EthnicitySearchFieldState extends State<_EthnicitySearchField> {
                     focusNode: _focusNode,
                     enabled: widget.enabled,
                     onChanged: _onTextChanged,
-                    style: GoogleFonts.spaceGrotesk(fontSize: 14, color: _offWhite),
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 14,
+                      color: _offWhite,
+                    ),
                     decoration: InputDecoration(
                       border: InputBorder.none,
                       hintText: 'Search your ethnicity...',
-                      hintStyle: GoogleFonts.spaceGrotesk(fontSize: 14, color: _subtle),
+                      hintStyle: GoogleFonts.spaceGrotesk(
+                        fontSize: 14,
+                        color: _subtle,
+                      ),
                     ),
                   ),
                 ),
@@ -1236,8 +1311,8 @@ class _EthnicitySearchFieldState extends State<_EthnicitySearchField> {
               constraints: const BoxConstraints(maxHeight: 200),
               decoration: const BoxDecoration(
                 border: Border(
-                  left:   BorderSide(color: _border),
-                  right:  BorderSide(color: _border),
+                  left: BorderSide(color: _border),
+                  right: BorderSide(color: _border),
                   bottom: BorderSide(color: _border),
                 ),
                 color: _dropdownCanvas,
@@ -1249,7 +1324,10 @@ class _EthnicitySearchFieldState extends State<_EthnicitySearchField> {
                   onTap: () => _select(_filtered[i]),
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: i < _filtered.length - 1
@@ -1259,7 +1337,10 @@ class _EthnicitySearchFieldState extends State<_EthnicitySearchField> {
                     ),
                     child: Text(
                       _filtered[i],
-                      style: GoogleFonts.spaceGrotesk(fontSize: 14, color: _offWhite),
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 14,
+                        color: _offWhite,
+                      ),
                     ),
                   ),
                 ),
