@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-03] — Chore: clean slate responses and polls
+
+- **Firestore**: Deleted all documents in the `responses` collection to reset sentiment data.
+- **Firestore**: Deleted all `polls` documents except for `ice_breaker_v1`.
+- **Firestore**: Restarted question rotation for 2026-06-03 by manually triggering poll activation for today's Pulse and Horizon questions.
+
+---
+
 ## [2026-06-03] — Fix: add intentionality check to sentiment analysis
 
 - **`functions/src/index.ts`**: Added an `INTENTIONALITY CHECK` to the Gemini sentiment analysis prompt. This filters out accidental recordings, silence, and ambient noise (traffic, wind, room tone) before processing, ensuring only purposeful audio content is analyzed and stored.
