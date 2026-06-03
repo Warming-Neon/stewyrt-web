@@ -125,7 +125,7 @@ class _RecordingSheetState extends State<RecordingSheet>
     if (kIsWeb) return;
     final status = await Permission.microphone.status;
     if (!mounted) return;
-    setState(() => _micPermissionDenied = status.isDenied || status.isPermanentlyDenied);
+    setState(() => _micPermissionDenied = !status.isGranted);
   }
 
   @override
