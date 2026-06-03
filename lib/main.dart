@@ -110,7 +110,6 @@ class _RootShellState extends State<RootShell> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final themeNotifier = context.read<ThemeNotifier>();
     final bgColor = isDark ? const Color(0xFF000000) : const Color(0xFFFFFFFF);
     final textColor = isDark
         ? const Color(0xFFF5F5F5)
