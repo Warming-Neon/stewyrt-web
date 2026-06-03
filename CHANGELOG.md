@@ -5,6 +5,12 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-03] — Chore: add ITSAppUsesNonExemptEncryption to Info.plist
+
+- **`ios/Runner/Info.plist`**: Added `ITSAppUsesNonExemptEncryption` set to `false` to declare standard OS encryption usage to Apple.
+
+---
+
 ## [2026-06-03] — Chore: remove mic permission debug logging
 
 - **`lib/screens/onboarding_screen.dart`**: Removed temporary `debugPrint` statements added for mic permission diagnostics.
