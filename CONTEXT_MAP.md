@@ -93,7 +93,7 @@ stewyrt/
 ├── pubspec.yaml
 ├── analysis_options.yaml
 ├── geminiignore                           — Excludes sensitive paths from Gemini context
-└── firebase.json
+└── firebase.json                          — Firebase configuration (hosting rewrites for support/privacy/terms/child-safety, caching headers, rules mapping)
 
 ---
 

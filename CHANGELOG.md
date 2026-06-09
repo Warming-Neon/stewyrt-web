@@ -5,6 +5,15 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Add support rewrite to firebase.json and clean up orphaned responses
+
+- **`firebase.json`**:
+  - Added a hosting rewrite rule for `/support` mapping to `/support.html` before the catch-all `**` rewrite.
+- **Database Maintenance**:
+  - Created and ran a temporary Node.js script (`scripts/cleanup_orphaned.js`) to delete documents in the `responses` collection that have no `uid` or an empty `uid` field, batching deletes in chunks of 500.
+
+---
+
 ## [2026-06-09] — Disable browser caching for Flutter web assets in firebase.json
 
 - **`firebase.json`**:
