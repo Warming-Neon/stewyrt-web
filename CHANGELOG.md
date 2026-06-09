@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Update all contact emails to social@stewyrt.com
+
+- **`web/privacy.html`, `web/support.html`, `web/child-safety.html`, `web/terms.html`**:
+  - Replaced all occurrences of `support@stewyrt.com` with `social@stewyrt.com` to direct all legal, support, data privacy, and child safety queries to the new primary inbox.
+
+---
+
 ## [2026-06-09] — Consolidate contact email addresses on legal and support pages
 
 - **`web/privacy.html`, `web/support.html`, `web/child-safety.html`, `web/terms.html`**:
