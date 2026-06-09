@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Use pause and seek instead of stop in feed player sheet for web compatibility
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Modified `_handleContentRemoved()` to use `_player.pause()` followed by `_player.seek(Duration.zero)` instead of `_player.stop()` to ensure audio player state compatibility on Web, while retaining the shared player instance.
+
+---
+
 ## [2026-06-09] — Make current response getter null-safe in feed player sheet
 
 - **`lib/widgets/sentiment_stream.dart`**:
