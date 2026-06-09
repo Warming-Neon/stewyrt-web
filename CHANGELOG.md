@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Consolidate contact email addresses on legal and support pages
+
+- **`web/privacy.html`, `web/support.html`, `web/child-safety.html`, `web/terms.html`**:
+  - Replaced all legacy instances of `privacy@stewyrt.com` and `hello@warmingneon.com` with `support@stewyrt.com` to consolidate data enquiries, support requests, and child safety reports to a single support mailbox.
+
+---
+
 ## [2026-06-09] — Remove block listener debug prints
 
 - **`lib/widgets/sentiment_stream.dart`**:

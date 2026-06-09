@@ -65,7 +65,7 @@ stewyrt/
 │   ├── brain_visualizer.html             — Self-contained Three.js 3D brain (The Resonance)
 │   ├── privacy.html                      — Privacy & Ethical Usage Policy (GDPR/UK PECR compliant, ICO ZC142846)
 │   ├── terms.html                        — Terms of Service (England & Wales, 18+ gate)
-│   ├── support.html                      — Help Center & FAQs (Space Grotesk theme)
+│   ├── support.html                      — Help Center & FAQs (Space Grotesk theme, consolidated support email)
 │   ├── index.html                        — Flutter web bootstrap (generated)
 │   ├── manifest.json                     — PWA manifest (generated)
 │   ├── favicon.png
