@@ -238,7 +238,7 @@ Open in any browser at `http://localhost:8080`.
 | `language` | String | ISO 639-1 code detected by Gemini (e.g. `"en"`, `"es"`, `"fr"`); defaults to `"en"` |
 | `blocked` | Boolean | Always present: `false` for approved, `true` if moderation triggered. **Never absent** — required for Firestore `isEqualTo: false` queries. |
 | `blockedReason` | String | e.g. `"content_policy"`, `"rate_limit"`, `"analysis_error"` (only on blocked docs) |
-| `uid` | String | Firebase Auth UID (present when derivable from responseId or auth context) |
+| `uid` | String | Firebase Auth UID (present when derivable from responseId, auth context, or metadata) |
 | `createdAt` | Timestamp | Server timestamp |
 
 **Note:** All three `*Region` fields carry the same value as `anatomicalRegion`. The Flutter aggregator votes across many responses per question to find the dominant region for each recurring emotion word.
@@ -594,7 +594,7 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 
 **Logic:**
 1. Require authenticated caller (`request.auth`)
-2. Delete `responses` where `uid == caller uid` (batch, production mode only; beta-mode responses have no `uid` field)
+2. Delete `responses` where `uid == caller uid` (batch)
 3. Delete `users/{uid}` document
 4. Attempt to delete `audio_uploads/onboarding_{uid}.m4a` (normally already gone; silent on error)
 5. Sentiment audio files use random UUIDs in their path and cannot be enumerated by uid — the 120-day purge schedule handles eventual deletion

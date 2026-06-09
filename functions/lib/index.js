@@ -36,7 +36,7 @@ const ALLOWED_REGIONS = ["Northern Europe", "Western Europe", "Southern Europe",
 //   onboarding_* → bot-detection verification flow
 //   everything else → sentiment analysis flow
 exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ bucket: "stewyrt-11.firebasestorage.app" }, async (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p;
     const filePath = event.data.name;
     // Only process uploads into audio_uploads/
     if (!filePath || !filePath.startsWith("audio_uploads/"))
@@ -193,6 +193,8 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ bucket: "stewyrt-11.fi
         // responseId = {uid}_{pollId}, from which the UID can be extracted.
         // In beta mode, we now derive the UID from the Firebase Auth context.
         const rateUid = extractUidForRateLimit(rawResponseId) || ((_m = event.auth) === null || _m === void 0 ? void 0 : _m.uid);
+        const metaUid = (_o = metadata["uid"]) !== null && _o !== void 0 ? _o : "";
+        const resolvedUid = rateUid || metaUid || null;
         if (!rateUid) {
             console.warn("[STEWYRT] No auth context available — skipping rate limiting and proceeding");
         }
@@ -304,7 +306,7 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ bucket: "stewyrt-11.fi
                     safetySettings,
                 },
             });
-            const raw = ((_o = result.text) !== null && _o !== void 0 ? _o : "").trim();
+            const raw = ((_p = result.text) !== null && _p !== void 0 ? _p : "").trim();
             const json = raw.replace(/^```json\s*/i, "").replace(/```\s*$/, "").trim();
             analysis = JSON.parse(json);
             if (analysis.blocked === true) {
@@ -367,8 +369,8 @@ exports.analyzeAudio = (0, storage_1.onObjectFinalized)({ bucket: "stewyrt-11.fi
             // In beta mode (UUID v4 responseId) UID is unavailable — no uid field
             // is written. Beta-mode responses are excluded from GDPR erasure via
             // deleteUserData; the 120-day audio purge is their only erasure path.
-            if (rateUid)
-                doc["uid"] = rateUid;
+            if (resolvedUid)
+                doc["uid"] = resolvedUid;
             tx.set(responseRef, doc);
             if (pollRef) {
                 tx.update(pollRef, {

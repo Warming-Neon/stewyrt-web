@@ -392,7 +392,16 @@ class _RecordingSheetState extends State<RecordingSheet>
     // ── Upload ───────────────────────────────────────────────────────────────
     debugPrint('[STEWYRT][SUBMIT] Starting Storage upload...');
     try {
-      await StorageService.uploadAudioClip(path, uuid, widget.question, widget.pollId, responseId);
+      await StorageService.uploadAudioClip(
+        path,
+        uuid,
+        widget.question,
+        widget.pollId,
+        responseId,
+        extraMetadata: {
+          'uid': FirebaseAuth.instance.currentUser?.uid ?? '',
+        },
+      );
       debugPrint('[STEWYRT][SUBMIT] ✅ Upload complete — waiting for Cloud Function...');
     } catch (e) {
       debugPrint('[STEWYRT][SUBMIT] ❌ Upload FAILED: $e');

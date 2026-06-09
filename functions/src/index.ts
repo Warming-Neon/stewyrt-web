@@ -232,6 +232,8 @@ export const analyzeAudio = onObjectFinalized(
       // responseId = {uid}_{pollId}, from which the UID can be extracted.
       // In beta mode, we now derive the UID from the Firebase Auth context.
       const rateUid = extractUidForRateLimit(rawResponseId) || (event as any).auth?.uid;
+      const metaUid = (metadata["uid"] as string | undefined) ?? "";
+      const resolvedUid = rateUid || metaUid || null;
 
       if (!rateUid) {
         console.warn("[STEWYRT] No auth context available — skipping rate limiting and proceeding");
@@ -418,7 +420,7 @@ export const analyzeAudio = onObjectFinalized(
         // In beta mode (UUID v4 responseId) UID is unavailable — no uid field
         // is written. Beta-mode responses are excluded from GDPR erasure via
         // deleteUserData; the 120-day audio purge is their only erasure path.
-        if (rateUid) doc["uid"] = rateUid;
+        if (resolvedUid) doc["uid"] = resolvedUid;
 
         tx.set(responseRef, doc);
 

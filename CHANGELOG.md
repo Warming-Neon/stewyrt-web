@@ -5,6 +5,16 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Store user ID in upload metadata and Firestore responses
+
+- **`lib/widgets/recording_sheet.dart`**:
+  - Added the user's Firebase Auth UID to the custom upload metadata under the key `"uid"` when standard response audio clips are uploaded to Firebase Storage.
+- **`functions/src/index.ts`**:
+  - Updated the `analyzeAudio` Cloud Function to fallback to reading the `"uid"` key from custom metadata if it cannot be extracted from `responseId` (e.g. in beta mode when using UUID v4 values), resolved as `resolvedUid`.
+  - Saved `resolvedUid` to the primary Firestore response document write under the `"uid"` field.
+
+---
+
 ## [2026-06-09] — Fix report sheet overflow & clean up debug prints
 
 - **`lib/widgets/sentiment_stream.dart`**:
