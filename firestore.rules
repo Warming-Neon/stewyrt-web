@@ -21,14 +21,9 @@ service cloud.firestore {
     // responses — done in Phase 1. Run the Phase 5 backfill before deploying
     // these rules so existing approved docs are not excluded.
     match /responses/{responseId} {
-      // resource is null when the document doesn't exist yet (Cloud Function
-      // hasn't written it). Allow the listener to attach and wait for the write.
-      allow get:   if request.auth != null
-                      && (resource == null
-                          || resource.data.blocked == null
-                          || resource.data.blocked == false);
-      allow list:  if request.auth != null
-                      && (resource.data.blocked == null || resource.data.blocked == false);
+      allow get:  if request.auth != null;
+      allow list: if request.auth != null
+                     && (resource.data.blocked == null || resource.data.blocked == false);
       allow write: if false;
     }
 

@@ -5,6 +5,15 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Allow direct get reads on blocked responses in firestore.rules
+
+- **`firestore.rules`**:
+  - Updated the `responses` collection rules to allow direct `get` requests (document reads) for all authenticated users without blocked filters, allowing real-time block/removal listeners to detect document modifications. Collection queries (`list`) remain restricted to non-blocked responses.
+- **Firebase Deploy**:
+  - Deployed the updated Firestore security rules.
+
+---
+
 ## [2026-06-09] — Revert audio context reset to pause only and deploy rules
 
 - **`lib/widgets/sentiment_stream.dart`**:

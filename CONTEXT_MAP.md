@@ -87,7 +87,7 @@ stewyrt/
 ├── assets/
 │   └── icon/stewyrt_icon.png
 │
-├── firestore.rules                        — Firestore security rules (client read-only, CF writes via Admin SDK)
+├── firestore.rules                        — Firestore security rules (allow get on responses, client read-only, CF writes via Admin SDK)
 ├── storage.rules                          — Storage security rules (auth + audio/* + 5MB cap)
 ├── firestore.indexes.json                 — Composite indexes for blocked-filter, poll-rotation, and schedule queries
 ├── pubspec.yaml
