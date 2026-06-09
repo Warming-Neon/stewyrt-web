@@ -5,6 +5,15 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Revert audio context reset to pause only and deploy rules
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Reverted `_handleContentRemoved()` to use just `_player.pause()` instead of `_player.setUrl('about:blank')` to avoid audio player reset issues.
+- **Firebase Deploy**:
+  - Deployed updated Firestore security rules.
+
+---
+
 ## [2026-06-09] — Reset audio source context on content removal and deploy Firestore rules
 
 - **`lib/widgets/sentiment_stream.dart`**:

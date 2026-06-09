@@ -40,7 +40,7 @@ stewyrt/
 │   │
 │   ├── widgets/
 │   │   ├── recording_sheet.dart          — Record / preview / submit bottom sheet; soft-block + human-review request; mic-denied banner
-│   │   ├── sentiment_stream.dart         — Live response feed scoped to current pollId; long-press report flow (_ReportSheet) & web-compatible reset-ready audio player sheet (_FeedPlayerSheet)
+│   │   ├── sentiment_stream.dart         — Live response feed scoped to current pollId; long-press report flow (_ReportSheet) & web-compatible audio player sheet (_FeedPlayerSheet)
 │   │   ├── poll_card.dart                — Poll question card (tier label, text scaling via FittedBox, nullable onTap for placeholder slots)
 │   │   ├── mic_permission_banner.dart    — Amber banner shown when mic permission denied; taps openAppSettings()
 │   │   └── verification_timeout_widget.dart — Shared recovery UI shown when verification or sentiment analysis times out
