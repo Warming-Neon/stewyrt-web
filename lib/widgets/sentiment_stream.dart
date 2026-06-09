@@ -527,7 +527,9 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> with SingleTickerPro
   void _handleContentRemoved() async {
     if (!mounted) return;
     await _player.pause();
-    await _player.seek(Duration.zero);
+    try {
+      await _player.setUrl('about:blank');
+    } catch (_) {}
     if (!mounted) return;
     await _animationController.reverse();
     if (!mounted) return;

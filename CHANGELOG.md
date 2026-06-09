@@ -5,6 +5,15 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Reset audio source context on content removal and deploy Firestore rules
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Replaced `_player.seek(Duration.zero)` in `_handleContentRemoved()` with `_player.setUrl('about:blank')` wrapped in a try/catch block to explicitly reset and release the active audio context when a playing response is deleted.
+- **Firebase Deploy**:
+  - Deployed updated Firestore security rules containing `user_blocks` collections access control rules.
+
+---
+
 ## [2026-06-09] — Use pause and seek instead of stop in feed player sheet for web compatibility
 
 - **`lib/widgets/sentiment_stream.dart`**:
