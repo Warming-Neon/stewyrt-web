@@ -73,6 +73,13 @@
         { "fieldPath": "pollId",    "order": "ASCENDING"  },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "blocked_responses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "blockedAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

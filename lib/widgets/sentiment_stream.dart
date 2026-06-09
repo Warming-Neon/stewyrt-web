@@ -90,6 +90,8 @@ class SentimentStream extends StatefulWidget {
 
 class _SentimentStreamState extends State<SentimentStream> {
   StreamSubscription? _streamSub;
+  StreamSubscription? _blocklistSub;
+  final Set<String> _personallyBlocked = {};
   final List<ResponseItem> _displayItems = [];
   late GlobalKey<AnimatedListState> _listKey;
   bool _initialized = false;
@@ -98,6 +100,7 @@ class _SentimentStreamState extends State<SentimentStream> {
   void initState() {
     super.initState();
     _subscribeToStream();
+    _loadPersonalBlocklist();
   }
 
   @override
@@ -111,7 +114,43 @@ class _SentimentStreamState extends State<SentimentStream> {
   @override
   void dispose() {
     _streamSub?.cancel();
+    _blocklistSub?.cancel();
     super.dispose();
+  }
+
+  void _loadPersonalBlocklist() {
+    _blocklistSub?.cancel();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    _blocklistSub = FirebaseFirestore.instance
+        .collection('user_blocks')
+        .doc(user.uid)
+        .collection('blocked_responses')
+        .snapshots()
+        .listen((snapshot) {
+      final blockedIds = snapshot.docs
+          .map((doc) => doc.data()['responseId'] as String?)
+          .whereType<String>()
+          .toSet();
+      if (mounted) {
+        setState(() {
+          _personallyBlocked.clear();
+          _personallyBlocked.addAll(blockedIds);
+          // Apply filter to current display items immediately
+          for (int i = _displayItems.length - 1; i >= 0; i--) {
+            if (_personallyBlocked.contains(_displayItems[i].id)) {
+              final removedItem = _displayItems.removeAt(i);
+              _listKey.currentState?.removeItem(
+                i,
+                (context, animation) => _buildItem(removedItem, animation),
+                duration: const Duration(milliseconds: 600),
+              );
+            }
+          }
+        });
+      }
+    });
   }
 
   void _subscribeToStream() {
@@ -132,6 +171,7 @@ class _SentimentStreamState extends State<SentimentStream> {
           final newItems = docs
               .map((d) => ResponseItem.fromFirestore(d))
               .where((r) => r.tone.isNotEmpty)
+              .where((r) => !_personallyBlocked.contains(r.id))
               .toList();
 
           if (!mounted) return;
@@ -205,11 +245,30 @@ class _SentimentStreamState extends State<SentimentStream> {
 
   void _showReportSheet(BuildContext context, ResponseItem item) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet(
+    showModalBottomSheet<dynamic>(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReportSheet(item: item),
-    );
+    ).then((result) {
+      if (result == true) {
+        if (mounted) {
+          setState(() {
+            _personallyBlocked.add(item.id);
+            // Remove the item from display items immediately
+            for (int i = _displayItems.length - 1; i >= 0; i--) {
+              if (_displayItems[i].id == item.id) {
+                final removedItem = _displayItems.removeAt(i);
+                _listKey.currentState?.removeItem(
+                  i,
+                  (context, animation) => _buildItem(removedItem, animation),
+                  duration: const Duration(milliseconds: 600),
+                );
+              }
+            }
+          });
+        }
+      }
+    });
   }
 
   Widget _buildItem(ResponseItem item, Animation<double> animation) {
@@ -840,13 +899,19 @@ class _ReportSheetState extends State<_ReportSheet> {
     final nav = Navigator.of(context);
     setState(() => _submitting = true);
     try {
-      await FirebaseFunctions.instance
+      final result = await FirebaseFunctions.instance
           .httpsCallable('submitContentReport')
           .call({'responseId': widget.item.id, 'reason': reason});
+      
+      bool isPersonalBlock = false;
+      if (result.data is Map) {
+        isPersonalBlock = (result.data['personalBlock'] == true);
+      }
+
       if (!mounted) return;
       setState(() { _submitting = false; _submitted = true; });
       await Future.delayed(const Duration(milliseconds: 900));
-      if (mounted) nav.pop();
+      if (mounted) nav.pop(isPersonalBlock);
     } catch (e) {
       debugPrint('[STEWYRT][REPORT] submitContentReport failed: $e');
       if (mounted) nav.pop();

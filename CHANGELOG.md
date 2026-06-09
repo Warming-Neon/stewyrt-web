@@ -5,6 +5,23 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Rebuild report/block system as personal content filter
+
+- **`functions/src/index.ts`**:
+  - Replaced the entire `submitContentReport` function to enforce personal blocks for all report reasons except `child_safety`.
+  - Rate limiting now counts documents in `user_blocks/{uid}/reports` instead of `moderation_queue`.
+  - `child_safety` reports still trigger auto-approved global blocks, strike increments in `user_strikes`, and bulk-blocking when 3 strikes are reached.
+  - All other report reasons write to `user_blocks/{reporterUid}/blocked_responses/{responseId}` to filter content personally, leaving the response document untouched, adding no strikes, and bypassing the `moderation_queue`.
+  - Created a new admin-only `restoreResponse` callable Cloud Function that resets blocked/deleted states on response documents, removes the respective strike from history, decrements the strike count (deleting the `user_strikes` doc if it hits 0), and updates all related `moderation_queue` entries to a `"restored"` status.
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Subscribed to a real-time Firestore listener on the user's personal block list (`user_blocks/{currentUid}/blocked_responses`) in `initState`, storing the subscription as `_blocklistSub` and cancelling it in `dispose()`.
+  - Added an additional filter on the live stream items to exclude personally blocked response IDs.
+  - Updated `_showReportSheet` and `_ReportSheetState._submit` to immediately append a blocked response ID to `_personallyBlocked` and remove it from the feed immediately if the Cloud Function returns `personalBlock: true`.
+- **`firestore.indexes.json`**:
+  - Added a composite index for `blocked_responses` on `blockedAt` DESCENDING.
+
+---
+
 ## [2026-06-09] — UGC safety compliance
 
 - **`lib/widgets/sentiment_stream.dart`**:

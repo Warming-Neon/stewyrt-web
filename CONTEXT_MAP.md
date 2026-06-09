@@ -72,7 +72,7 @@ stewyrt/
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, approveModerationReport, dismissModerationReport, deleteOwnResponse, activateDailyQuestion, activateDailyQuestionManual
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, restoreResponse, approveModerationReport, dismissModerationReport, deleteOwnResponse, activateDailyQuestion, activateDailyQuestionManual
 │
 ├── scripts/
 │   ├── seed_questions.js                 — Idempotent seed: populates questions collection; uses ../functions/node_modules/firebase-admin
@@ -367,16 +367,16 @@ One document per phrase. Seeded by `scripts/seed_waiting_phrases.js`.
 | `active` | Boolean | Only `active == true` docs are fetched |
 
 ### `moderation_queue` collection
-Created by `submitContentReport` callable. Contains incoming content reports.
+Created by `submitContentReport` callable. Contains incoming child_safety content reports (since other reasons only trigger personal blocks).
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `responseId` | String | UUID v4 of the reported response |
-| `reason` | String | One of: `harassment` / `hate_speech` / `spam` / `misinformation` / `other` |
+| `reason` | String | One of: `child_safety` |
 | `reporterUid` | String | Firebase Auth UID of the reporter |
 | `reportedAt` | Timestamp | Server timestamp |
 | `targetUid` | String | Firebase Auth UID of the creator of the response |
-| `status` | String | `"pending"` / `"auto_approved"` / `"approved"` / `"dismissed"` |
+| `status` | String | `"auto_approved"` / `"approved"` / `"dismissed"` / `"restored"` |
 
 ### `user_strikes` collection
 Stores strike history for users who submit policy-violating content.
@@ -397,6 +397,27 @@ Stores UIDs of permanently blocked users (e.g. 3-strikes limit hit).
 | `bannedAt` | Timestamp | Banned date |
 | `reason` | String | `"three_strikes"` / `"ejected"` |
 | `strikeHistory` | Array | Copy of user's strikeHistory from `user_strikes` |
+
+### `user_blocks` collection
+Top-level collection that acts as a container for personal filter and rate-limiting subcollections. Document IDs correspond to the Firebase Auth UID of the reporter/blocking user.
+
+#### Subcollection: `blocked_responses`
+Stores responses personally blocked by this user.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `responseId` | String | UUID v4 of the blocked response |
+| `reason` | String | Reason for block: `harassment` / `hate_speech` / `spam` / `misinformation` / `other` |
+| `blockedAt` | Timestamp | Server timestamp |
+
+#### Subcollection: `reports`
+Tracks all submitted reports (both global and personal) for rate limiting.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `responseId` | String | UUID v4 of the reported response |
+| `reason` | String | Reason for report |
+| `reportedAt` | Timestamp | Server timestamp |
 
 ### Storage paths
 - `audio_uploads/<uuid>.m4a` — poll responses; retained **up to 120 days** then auto-purged
@@ -586,14 +607,33 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 
 **Logic:**
 1. Require authenticated caller (`request.auth`)
-2. Validate `responseId` (UUID v4 regex) and `reason` (allowlist: `harassment` / `hate_speech` / `spam` / `misinformation` / `other`)
-3. Rate-limit: count `moderation_queue` where `reporterUid == uid` and `reportedAt >= now − 1 hour`; reject with `resource-exhausted` if ≥ 10
+2. Validate `responseId` (UUID v4 regex) and `reason` (allowlist: `harassment` / `hate_speech` / `spam` / `misinformation` / `other` / `child_safety`)
+3. Rate-limit: count `user_blocks/{uid}/reports` where `reportedAt >= now − 1 hour`; reject with `resource-exhausted` if ≥ 10
 4. Verify `responses/{responseId}` exists (reject `not-found` if absent)
-5. If reason is AUTO-APPROVE (`hate_speech`, `harassment`):
-   - Block response, update status to `auto_approved` in `moderation_queue`
-   - Log strike to `user_strikes`
+5. Log the report to `user_blocks/{uid}/reports` collection
+6. If reason is `child_safety` (AUTO-APPROVE):
+   - Block response (set `blocked: true`), update status to `auto_approved` in `moderation_queue`
+   - Log strike to `user_strikes/{targetUid}`
    - If strikes reach 3, add user to `blocked_uids` and bulk-block all responses for user
-6. Otherwise, log report with status `pending` to `moderation_queue`
+7. For all other reasons:
+   - Write to `user_blocks/{reporterUid}/blocked_responses/{responseId}` with `blockedAt: serverTimestamp()`
+   - Do NOT touch the response document
+   - Do NOT write to `moderation_queue` or add strikes
+   - Return `{ success: true, personalBlock: true }`
+
+---
+
+### `restoreResponse` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Require authenticated caller (`request.auth`) and verify caller UID matches `ADMIN_UID`
+2. Validate `responseId`
+3. Set `blocked: false` and `deletedByUser: false` on `responses/{responseId}` document
+4. Find the `user_strikes/{targetUid}` entry for this `responseId`, remove the entry from `strikeHistory`, and decrement `strikes` by 1. If `strikes` count hits 0, delete the `user_strikes` document
+5. Query `moderation_queue` documents where `responseId == responseId` and update their status to `"restored"`
+6. Return `{ success: true }`
 
 ---
 
