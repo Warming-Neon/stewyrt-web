@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Fix race condition on feed player sheet dismissal
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Replaced `.then()` callback chain in `_handleContentRemoved()` with an `async`/`await` implementation.
+  - Added `mounted` checks at each step to prevent potential crashes/memory leaks if the widget is unmounted/disposed while player actions or animations are in progress.
+
+---
+
 ## [2026-06-09] — Add support rewrite to firebase.json and clean up orphaned responses
 
 - **`firebase.json`**:

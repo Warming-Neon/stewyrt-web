@@ -516,23 +516,23 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> with SingleTickerPro
     super.dispose();
   }
 
-  void _handleContentRemoved() {
-    _player.stop();
+  void _handleContentRemoved() async {
+    if (!mounted) return;
+    await _player.stop();
+    if (!mounted) return;
+    await _animationController.reverse();
+    if (!mounted) return;
     final messenger = ScaffoldMessenger.of(context);
-    _animationController.reverse().then((_) {
-      if (mounted) {
-        Navigator.of(context).pop();
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(
-              'This response is no longer available',
-              style: GoogleFonts.spaceGrotesk(),
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    });
+    Navigator.of(context).pop();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          'This response is no longer available',
+          style: GoogleFonts.spaceGrotesk(),
+        ),
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _loadAndPlay(int orderIdx, {bool play = true}) async {
