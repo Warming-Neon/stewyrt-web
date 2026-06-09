@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Disable browser caching for Flutter web assets in firebase.json
+
+- **`firebase.json`**:
+  - Configured cache control headers for `**/*.js`, `**/*.json`, and `flutter_service_worker.js` to `no-cache, no-store, must-revalidate` in the Hosting configuration block.
+
+---
+
 ## [2026-06-09] — Update firestore rules for user_blocks, support URL, and support page icon
 
 - **`firestore.rules`**:
