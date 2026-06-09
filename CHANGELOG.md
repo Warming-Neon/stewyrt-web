@@ -5,6 +5,17 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Update firestore rules for user_blocks, support URL, and support page icon
+
+- **`firestore.rules`**:
+  - Added read/write access control rules for the `user_blocks/{uid}/blocked_responses` and `user_blocks/{uid}/reports` collections, restricting access exclusively to the owning user.
+- **`web/support.html`**:
+  - Updated the logo image source path to use the high-resolution PNG asset at `assets/icon/stew_iconn.png`.
+- **`lib/screens/settings_screen.dart`**:
+  - Changed the "Contact Support" action from opening a `mailto:` email client link to launching the Help Center web page at `https://stewyrt.com/support.html`.
+
+---
+
 ## [2026-06-09] — Store user ID in upload metadata and Firestore responses
 
 - **`lib/widgets/recording_sheet.dart`**:

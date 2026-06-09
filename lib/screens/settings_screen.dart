@@ -266,7 +266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   fg: fg,
                   sub: sub,
                   border: border,
-                  onTap: () => _openUrl('mailto:support@stewyrt.com'),
+                  onTap: () => _openUrl('https://stewyrt.com/support.html'),
                 ),
                 _TapRow(
                   label: 'FAQ',
