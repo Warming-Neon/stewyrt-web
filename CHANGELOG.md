@@ -16,7 +16,7 @@ Format: `[version or date] — summary`, newest first.
 - **`lib/widgets/sentiment_stream.dart`**:
   - Subscribed to a real-time Firestore listener on the user's personal block list (`user_blocks/{currentUid}/blocked_responses`) in `initState`, storing the subscription as `_blocklistSub` and cancelling it in `dispose()`.
   - Added an additional filter on the live stream items to exclude personally blocked response IDs.
-  - Updated `_showReportSheet` and `_ReportSheetState._submit` to immediately append a blocked response ID to `_personallyBlocked` and remove it from the feed immediately if the Cloud Function returns `personalBlock: true`.
+  - Updated `_showReportSheet` and `_ReportSheetState._submit` to immediately append a blocked response ID to `_personallyBlocked` and remove it from the feed immediately if the Cloud Function returns `personalBlock: true`. Added diagnostic `debugPrint` logs to verify propagation of values.
 - **`firestore.indexes.json`**:
   - Added a composite index for `blocked_responses` on `blockedAt` DESCENDING.
 

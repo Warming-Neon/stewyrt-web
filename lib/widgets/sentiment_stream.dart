@@ -250,6 +250,7 @@ class _SentimentStreamState extends State<SentimentStream> {
       backgroundColor: Colors.transparent,
       builder: (_) => _ReportSheet(item: item),
     ).then((result) {
+      debugPrint('[REPORT DEBUG] sheet closed with result: $result');
       if (result == true) {
         if (mounted) {
           setState(() {
@@ -907,11 +908,16 @@ class _ReportSheetState extends State<_ReportSheet> {
       if (result.data is Map) {
         isPersonalBlock = (result.data['personalBlock'] == true);
       }
+      debugPrint('[REPORT DEBUG] result.data: ${result.data}');
+      debugPrint('[REPORT DEBUG] isPersonalBlock: $isPersonalBlock');
 
       if (!mounted) return;
       setState(() { _submitting = false; _submitted = true; });
       await Future.delayed(const Duration(milliseconds: 900));
-      if (mounted) nav.pop(isPersonalBlock);
+      if (mounted) {
+        nav.pop(isPersonalBlock);
+        debugPrint('[REPORT DEBUG] popped with: $isPersonalBlock');
+      }
     } catch (e) {
       debugPrint('[STEWYRT][REPORT] submitContentReport failed: $e');
       if (mounted) nav.pop();
