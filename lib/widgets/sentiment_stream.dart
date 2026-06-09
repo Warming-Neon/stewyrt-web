@@ -878,6 +878,7 @@ class _ReportSheetState extends State<_ReportSheet> {
     'hate_speech',
     'spam',
     'other',
+    'child_safety',
   ];
 
   String _getReasonLabel(String reason) {
@@ -890,6 +891,8 @@ class _ReportSheetState extends State<_ReportSheet> {
         return 'Spam or fake';
       case 'other':
         return 'Other';
+      case 'child_safety':
+        return 'Child safety concern';
       default:
         return reason;
     }

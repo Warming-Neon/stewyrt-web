@@ -10,6 +10,7 @@ Format: `[version or date] — summary`, newest first.
 - **`lib/widgets/sentiment_stream.dart`**:
   - Wrapped the `_ReportSheet` inner Column in a `SingleChildScrollView` to prevent visual overflow on smaller viewports.
   - Removed all temporary `[REPORT DEBUG]` diagnostic debug logs.
+  - Added `child_safety` to the list of user report options and localized its UI description label.
 
 ---
 
