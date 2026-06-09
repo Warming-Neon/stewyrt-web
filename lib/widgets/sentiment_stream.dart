@@ -477,7 +477,15 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> with SingleTickerPro
 
   late AnimationController _animationController;
 
-  ResponseItem get _current => widget.items[_order[_orderIndex]];
+  ResponseItem? get _current {
+    if (widget.items.isEmpty || 
+        _orderIndex >= widget.items.length ||
+        _order.isEmpty ||
+        _orderIndex >= _order.length) return null;
+    final idx = _order[_orderIndex];
+    if (idx >= widget.items.length) return null;
+    return widget.items[idx];
+  }
 
   @override
   void initState() {
@@ -635,6 +643,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> with SingleTickerPro
     final chip   = isDark ? const Color(0xFF111111) : const Color(0xFFF0F0F0);
     final handle = sub.withValues(alpha: 0.4);
     final item   = _current;
+    if (item == null) return const SizedBox.shrink();
 
     final progress = _duration.inMilliseconds > 0
         ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)

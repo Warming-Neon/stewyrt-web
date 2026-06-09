@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Make current response getter null-safe in feed player sheet
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Updated the `_current` response getter in `_FeedPlayerSheetState` to be null-safe and return `null` if the items list or index maps are out of bounds or empty.
+  - Added a null guard at the top of the `build` method to return an empty widget (`SizedBox.shrink()`) if `_current` is null, preventing indexing crashes when a playing response is deleted.
+
+---
+
 ## [2026-06-09] — Fix race condition on feed player sheet dismissal
 
 - **`lib/widgets/sentiment_stream.dart`**:
