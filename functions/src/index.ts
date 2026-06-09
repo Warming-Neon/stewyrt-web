@@ -73,6 +73,28 @@ export const analyzeAudio = onObjectFinalized(
     const metadata      = event.data.metadata ?? {};
     const db            = admin.firestore();
 
+    // ── Check if the submitting UID is blocked ───────────────────────────────
+    let submittingUid: string | null = null;
+    if (fileName.startsWith("onboarding_")) {
+      submittingUid = fileName.replace(/^onboarding_/, "").replace(/\.m4a$/, "");
+    } else {
+      const rawResponseId = (metadata["responseId"] as string | undefined) ?? "";
+      submittingUid = extractUidForRateLimit(rawResponseId) || (event as any).auth?.uid || null;
+    }
+
+    if (submittingUid) {
+      const blockedDoc = await db.collection("blocked_uids").doc(submittingUid).get();
+      if (blockedDoc.exists) {
+        console.warn(`[STEWYRT] Submitting UID ${submittingUid} is blocked. Silent exit.`);
+        try {
+          await storageBucket.file(filePath).delete();
+        } catch (err) {
+          console.error("[STEWYRT] Failed to delete blocked user audio:", err);
+        }
+        return;
+      }
+    }
+
     await storageBucket.file(filePath).download({ destination: tempFilePath });
 
     // ── Route: onboarding_ prefix → Verification, otherwise → Sentiment ──────
@@ -969,7 +991,7 @@ export const deleteUserData = onCall(async (request) => {
 
 // ── submitContentReport ───────────────────────────────────────────────────────
 // Callable. Accepts { responseId, reason } from an authenticated user and
-// writes a moderation record to content_reports.
+// writes a moderation record to moderation_queue.
 // Rate limit: max 10 reports per user per rolling hour.
 export const submitContentReport = onCall(async (request) => {
   if (!request.auth) {
@@ -1002,8 +1024,8 @@ export const submitContentReport = onCall(async (request) => {
   // Rate limit: max 10 reports per user per rolling hour.
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
   const recentSnap = await db
-    .collection("content_reports")
-    .where("reportedBy", "==", uid)
+    .collection("moderation_queue")
+    .where("reporterUid", "==", uid)
     .where("reportedAt", ">=", oneHourAgo)
     .get();
   if (recentSnap.size >= 10) {
@@ -1011,18 +1033,268 @@ export const submitContentReport = onCall(async (request) => {
   }
 
   // Verify the response doc exists.
-  const responseDoc = await db.collection("responses").doc(responseId).get();
+  const responseRef = db.collection("responses").doc(responseId);
+  const responseDoc = await responseRef.get();
   if (!responseDoc.exists) {
     throw new HttpsError("not-found", "Response not found.");
   }
 
-  // Write the report.
-  await db.collection("content_reports").add({
-    responseId,
-    reason,
-    reportedBy: uid,
-    reportedAt: admin.firestore.FieldValue.serverTimestamp(),
-    reviewed:   false,
+  const responseData = responseDoc.data()!;
+  const targetUid = responseData.uid || "";
+
+  const isAutoApprove = reason === "hate_speech" || reason === "harassment";
+
+  if (isAutoApprove) {
+    // Query responses to bulk-block if strikes reach 3
+    let userResponsesRefs: admin.firestore.DocumentReference[] = [];
+    if (targetUid) {
+      const userResponsesSnap = await db.collection("responses")
+        .where("uid", "==", targetUid)
+        .get();
+      userResponsesRefs = userResponsesSnap.docs.map(doc => doc.ref);
+    }
+
+    await db.runTransaction(async (transaction) => {
+      let newStrikes = 1;
+      let strikeHistoryCopy: any[] = [];
+      const nowTimestamp = admin.firestore.Timestamp.now();
+      const newHistoryItem = { responseId, reason, timestamp: nowTimestamp };
+
+      if (targetUid) {
+        const strikeRef = db.collection("user_strikes").doc(targetUid);
+        const strikeDoc = await transaction.get(strikeRef);
+        if (!strikeDoc.exists) {
+          strikeHistoryCopy = [newHistoryItem];
+          transaction.set(strikeRef, {
+            strikes: 1,
+            firstStrike: nowTimestamp,
+            lastStrike: nowTimestamp,
+            strikeHistory: strikeHistoryCopy,
+          });
+        } else {
+          const strikeData = strikeDoc.data()!;
+          newStrikes = (strikeData.strikes || 0) + 1;
+          strikeHistoryCopy = [...(strikeData.strikeHistory || []), newHistoryItem];
+          transaction.update(strikeRef, {
+            strikes: newStrikes,
+            lastStrike: nowTimestamp,
+            strikeHistory: strikeHistoryCopy,
+          });
+        }
+      }
+
+      // Set blocked: true on the response document immediately
+      transaction.update(responseRef, { blocked: true });
+
+      // Always log the report to moderation_queue
+      const queueRef = db.collection("moderation_queue").doc();
+      transaction.set(queueRef, {
+        responseId,
+        reason,
+        reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reporterUid: uid,
+        status: "auto_approved",
+        targetUid,
+      });
+
+      // If strike count reaches 3
+      if (targetUid && newStrikes >= 3) {
+        const blockedUidRef = db.collection("blocked_uids").doc(targetUid);
+        transaction.set(blockedUidRef, {
+          uid: targetUid,
+          bannedAt: admin.firestore.FieldValue.serverTimestamp(),
+          reason: "three_strikes",
+          strikeHistory: strikeHistoryCopy,
+        });
+
+        // Set blocked: true on ALL response documents where uid == targetUid
+        for (const ref of userResponsesRefs) {
+          transaction.update(ref, { blocked: true });
+        }
+      }
+    });
+  } else {
+    // For QUEUE reasons ('spam', 'misinformation', 'other'):
+    // - Log to moderation_queue with status: 'pending'
+    // - Do NOT auto-approve
+    // - Do NOT block the response yet
+    await db.collection("moderation_queue").add({
+      responseId,
+      reason,
+      reportedAt: admin.firestore.FieldValue.serverTimestamp(),
+      reporterUid: uid,
+      status: "pending",
+      targetUid,
+    });
+  }
+
+  return { success: true };
+});
+
+const ADMIN_UID = "PLACEHOLDER_SET_AFTER_AUTH_SETUP";
+
+// ── approveModerationReport ──────────────────────────────────────────────────
+// Callable. Accepts { reportId, ejectUser } from an authenticated admin and
+// approves the moderation report, blocking the response and updating strikes.
+export const approveModerationReport = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  if (request.auth.uid !== ADMIN_UID) {
+    throw new HttpsError("permission-denied", "Unauthorized. Administrator access required.");
+  }
+
+  const data = request.data as { reportId?: unknown; ejectUser?: unknown };
+  if (typeof data.reportId !== "string" || !data.reportId) {
+    throw new HttpsError("invalid-argument", "reportId must be a non-empty string.");
+  }
+  const reportId = data.reportId;
+  const ejectUser = !!data.ejectUser;
+
+  const db = admin.firestore();
+  const queueRef = db.collection("moderation_queue").doc(reportId);
+  const queueDoc = await queueRef.get();
+  if (!queueDoc.exists) {
+    throw new HttpsError("not-found", "Moderation report not found.");
+  }
+
+  const queueData = queueDoc.data()!;
+  const responseId = queueData.responseId;
+  const targetUid = queueData.targetUid || "";
+  const reason = queueData.reason || "unknown";
+
+  if (typeof responseId !== "string" || !responseId) {
+    throw new HttpsError("failed-precondition", "Report has no valid responseId.");
+  }
+
+  // Get all responses to bulk-block if needed
+  let userResponsesRefs: admin.firestore.DocumentReference[] = [];
+  if (targetUid) {
+    const userResponsesSnap = await db.collection("responses")
+      .where("uid", "==", targetUid)
+      .get();
+    userResponsesRefs = userResponsesSnap.docs.map(doc => doc.ref);
+  }
+
+  await db.runTransaction(async (transaction) => {
+    // Re-verify queue doc in transaction
+    const qDoc = await transaction.get(queueRef);
+    if (!qDoc.exists) {
+      throw new HttpsError("not-found", "Moderation report not found in transaction.");
+    }
+
+    const responseRef = db.collection("responses").doc(responseId);
+    // 1. Set blocked: true on the response document
+    transaction.update(responseRef, { blocked: true });
+
+    // 2. Update moderation_queue document status to 'approved'
+    transaction.update(queueRef, { status: "approved" });
+
+    // 3. Increment strike on user_strikes
+    let strikes = 1;
+    let strikeHistoryCopy: any[] = [];
+    const nowTimestamp = admin.firestore.Timestamp.now();
+    const newHistoryItem = { responseId, reason, timestamp: nowTimestamp };
+
+    if (targetUid) {
+      const strikeRef = db.collection("user_strikes").doc(targetUid);
+      const strikeDoc = await transaction.get(strikeRef);
+      if (!strikeDoc.exists) {
+        strikeHistoryCopy = [newHistoryItem];
+        transaction.set(strikeRef, {
+          strikes: 1,
+          firstStrike: nowTimestamp,
+          lastStrike: nowTimestamp,
+          strikeHistory: strikeHistoryCopy,
+        });
+      } else {
+        const strikeData = strikeDoc.data()!;
+        strikes = (strikeData.strikes || 0) + 1;
+        strikeHistoryCopy = [...(strikeData.strikeHistory || []), newHistoryItem];
+        transaction.update(strikeRef, {
+          strikes: strikes,
+          lastStrike: nowTimestamp,
+          strikeHistory: strikeHistoryCopy,
+        });
+      }
+    }
+
+    // 4. If ejectUser is true OR strikes >= 3: adds to blocked_uids and bulk-blocks all responses for that UID
+    if (targetUid && (ejectUser || strikes >= 3)) {
+      const blockedUidRef = db.collection("blocked_uids").doc(targetUid);
+      transaction.set(blockedUidRef, {
+        uid: targetUid,
+        bannedAt: admin.firestore.FieldValue.serverTimestamp(),
+        reason: strikes >= 3 ? "three_strikes" : "ejected",
+        strikeHistory: strikeHistoryCopy,
+      });
+
+      for (const ref of userResponsesRefs) {
+        transaction.update(ref, { blocked: true });
+      }
+    }
+  });
+
+  return { success: true };
+});
+
+// ── dismissModerationReport ──────────────────────────────────────────────────
+// Callable. Accepts { reportId } from an authenticated admin and
+// dismisses the moderation report without blocking or adding strikes.
+export const dismissModerationReport = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  if (request.auth.uid !== ADMIN_UID) {
+    throw new HttpsError("permission-denied", "Unauthorized. Administrator access required.");
+  }
+
+  const data = request.data as { reportId?: unknown };
+  if (typeof data.reportId !== "string" || !data.reportId) {
+    throw new HttpsError("invalid-argument", "reportId must be a non-empty string.");
+  }
+  const reportId = data.reportId;
+
+  const db = admin.firestore();
+  await db.collection("moderation_queue").doc(reportId).update({
+    status: "dismissed",
+  });
+
+  return { success: true };
+});
+
+// ── deleteOwnResponse ────────────────────────────────────────────────────────
+// Callable. Accepts { responseId } from an authenticated user and allows them
+// to delete (hide) their own response doc.
+export const deleteOwnResponse = onCall(async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+
+  const uid = request.auth.uid;
+  const data = request.data as { responseId?: unknown };
+
+  if (typeof data.responseId !== "string" || !UUID_V4_RE.test(data.responseId)) {
+    throw new HttpsError("invalid-argument", "responseId must be a valid UUID v4.");
+  }
+  const responseId = data.responseId;
+
+  const db = admin.firestore();
+  const responseRef = db.collection("responses").doc(responseId);
+  const responseDoc = await responseRef.get();
+
+  if (!responseDoc.exists) {
+    throw new HttpsError("not-found", "Response not found.");
+  }
+
+  const responseData = responseDoc.data()!;
+  if (responseData.uid !== uid) {
+    throw new HttpsError("permission-denied", "You do not have permission to delete this response.");
+  }
+
+  await responseRef.update({
+    blocked: true,
+    deletedByUser: true,
   });
 
   return { success: true };

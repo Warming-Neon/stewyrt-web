@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -19,6 +20,7 @@ class ResponseItem {
   final String question;
   final String audioPath;
   final DateTime? createdAt;
+  final String uid;
 
   const ResponseItem({
     required this.id,
@@ -29,6 +31,7 @@ class ResponseItem {
     required this.question,
     required this.audioPath,
     required this.createdAt,
+    required this.uid,
   });
 
   factory ResponseItem.fromFirestore(
@@ -43,6 +46,7 @@ class ResponseItem {
       question:  d['question']  as String? ?? '',
       audioPath: _resolveAudioPath(d, doc.id),
       createdAt: (d['createdAt'] as Timestamp?)?.toDate(),
+      uid:       d['uid']       as String? ?? '',
     );
   }
 
@@ -85,30 +89,96 @@ class SentimentStream extends StatefulWidget {
 }
 
 class _SentimentStreamState extends State<SentimentStream> {
-  late Stream<QuerySnapshot<Map<String, dynamic>>> _stream;
+  StreamSubscription? _streamSub;
+  final List<ResponseItem> _displayItems = [];
+  late GlobalKey<AnimatedListState> _listKey;
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _stream = _buildStream();
+    _subscribeToStream();
   }
 
   @override
   void didUpdateWidget(SentimentStream old) {
     super.didUpdateWidget(old);
     if (old.pollId != widget.pollId) {
-      setState(() => _stream = _buildStream());
+      _subscribeToStream();
     }
   }
 
-  Stream<QuerySnapshot<Map<String, dynamic>>> _buildStream() {
-    return FirebaseFirestore.instance
+  @override
+  void dispose() {
+    _streamSub?.cancel();
+    super.dispose();
+  }
+
+  void _subscribeToStream() {
+    _listKey = GlobalKey<AnimatedListState>();
+    _streamSub?.cancel();
+    _initialized = false;
+    _displayItems.clear();
+
+    _streamSub = FirebaseFirestore.instance
         .collection('responses')
         .where('pollId', isEqualTo: widget.pollId)
         .where('blocked', isEqualTo: false)
         .orderBy('createdAt', descending: true)
         .limit(30)
-        .snapshots();
+        .snapshots()
+        .listen((snapshot) {
+          final docs = snapshot.docs;
+          final newItems = docs
+              .map((d) => ResponseItem.fromFirestore(d))
+              .where((r) => r.tone.isNotEmpty)
+              .toList();
+
+          if (!mounted) return;
+
+          if (!_initialized) {
+            setState(() {
+              _displayItems.addAll(newItems);
+              _initialized = true;
+            });
+          } else {
+            setState(() {
+              _updateList(newItems);
+            });
+          }
+        });
+  }
+
+  void _updateList(List<ResponseItem> newItems) {
+    // 1. Removals
+    for (int i = _displayItems.length - 1; i >= 0; i--) {
+      final oldItem = _displayItems[i];
+      final exists = newItems.any((item) => item.id == oldItem.id);
+      if (!exists) {
+        final removedItem = _displayItems.removeAt(i);
+        _listKey.currentState?.removeItem(
+          i,
+          (context, animation) => _buildItem(removedItem, animation),
+          duration: const Duration(milliseconds: 600),
+        );
+      }
+    }
+
+    // 2. Insertions & Updates
+    for (int i = 0; i < newItems.length; i++) {
+      final newItem = newItems[i];
+      final existingIndex = _displayItems.indexWhere((item) => item.id == newItem.id);
+      if (existingIndex == -1) {
+        _displayItems.insert(i, newItem);
+        _listKey.currentState?.insertItem(
+          i,
+          duration: const Duration(milliseconds: 600),
+        );
+      } else if (existingIndex != i) {
+        final item = _displayItems.removeAt(existingIndex);
+        _displayItems.insert(i, item);
+      }
+    }
   }
 
   String _timeAgo(DateTime? dt) {
@@ -133,12 +203,78 @@ class _SentimentStreamState extends State<SentimentStream> {
     );
   }
 
-  void _showReportSheet(BuildContext context, String responseId) {
+  void _showReportSheet(BuildContext context, ResponseItem item) {
     HapticFeedback.mediumImpact();
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) => _ReportSheet(responseId: responseId),
+      builder: (_) => _ReportSheet(item: item),
+    );
+  }
+
+  Widget _buildItem(ResponseItem item, Animation<double> animation) {
+    final isDark  = Theme.of(context).brightness == Brightness.dark;
+    final fg      = isDark ? const Color(0xFFF5F5F5) : const Color(0xFF000000);
+    final sub     = isDark ? const Color(0xFF666666) : const Color(0xFF999999);
+    final border  = isDark ? const Color(0xFF1A1A1A) : const Color(0xFFEEEEEE);
+
+    return FadeTransition(
+      opacity: animation,
+      child: Column(
+        children: [
+          GestureDetector(
+            onTap: () {
+              final idx = _displayItems.indexWhere((r) => r.id == item.id);
+              if (idx != -1) {
+                _showPlayer(context, _displayItems, idx);
+              }
+            },
+            onLongPress: () => _showReportSheet(context, item),
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.tone,
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: fg,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '"${item.summary}"',
+                          style: GoogleFonts.spaceGrotesk(
+                            fontSize: 12,
+                            color: sub,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    _timeAgo(item.createdAt),
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 11, color: sub,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Divider(color: border, height: 1),
+        ],
+      ),
     );
   }
 
@@ -147,7 +283,6 @@ class _SentimentStreamState extends State<SentimentStream> {
     final isDark  = Theme.of(context).brightness == Brightness.dark;
     final fg      = isDark ? const Color(0xFFF5F5F5) : const Color(0xFF000000);
     final sub     = isDark ? const Color(0xFF666666) : const Color(0xFF999999);
-    final border  = isDark ? const Color(0xFF1A1A1A) : const Color(0xFFEEEEEE);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,10 +319,9 @@ class _SentimentStreamState extends State<SentimentStream> {
 
         // Live feed
         Expanded(
-          child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-            stream: _stream,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+          child: Builder(
+            builder: (context) {
+              if (!_initialized) {
                 return Center(
                   child: SizedBox(
                     width: 16, height: 16,
@@ -198,13 +332,7 @@ class _SentimentStreamState extends State<SentimentStream> {
                 );
               }
 
-              final docs  = snapshot.data?.docs ?? [];
-              final items = docs
-                  .map((d) => ResponseItem.fromFirestore(d))
-                  .where((r) => r.tone.isNotEmpty)
-                  .toList();
-
-              if (items.isEmpty) {
+              if (_displayItems.isEmpty) {
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -236,57 +364,12 @@ class _SentimentStreamState extends State<SentimentStream> {
                 );
               }
 
-              return ListView.separated(
+              return AnimatedList(
+                key: _listKey,
+                initialItemCount: _displayItems.length,
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: items.length,
-                separatorBuilder: (_, _) => Divider(color: border, height: 1),
-                itemBuilder: (context, i) {
-                  final item = items[i];
-                  return GestureDetector(
-                    onTap: () => _showPlayer(context, items, i),
-                    onLongPress: () => _showReportSheet(context, item.id),
-                    behavior: HitTestBehavior.opaque,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.tone,
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: fg,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '"${item.summary}"',
-                                  style: GoogleFonts.spaceGrotesk(
-                                    fontSize: 12,
-                                    color: sub,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _timeAgo(item.createdAt),
-                            style: GoogleFonts.spaceGrotesk(
-                              fontSize: 11, color: sub,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                itemBuilder: (context, index, animation) {
+                  return _buildItem(_displayItems[index], animation);
                 },
               );
             },
@@ -314,7 +397,7 @@ class _FeedPlayerSheet extends StatefulWidget {
   State<_FeedPlayerSheet> createState() => _FeedPlayerSheetState();
 }
 
-class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
+class _FeedPlayerSheetState extends State<_FeedPlayerSheet> with SingleTickerProviderStateMixin {
   late List<int> _order;   // indices into widget.items, may be shuffled
   late int _orderIndex;    // current position in _order
 
@@ -331,6 +414,9 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
   StreamSubscription? _playerStateSub;
+  StreamSubscription? _blockSub;
+
+  late AnimationController _animationController;
 
   ResponseItem get _current => widget.items[_order[_orderIndex]];
 
@@ -339,6 +425,12 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
     super.initState();
     _order      = List.generate(widget.items.length, (i) => i);
     _orderIndex = widget.initialIndex;
+
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+      value: 1.0,
+    );
 
     _positionSub = _player.positionStream.listen((p) {
       if (mounted) setState(() => _position = p);
@@ -359,13 +451,47 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playerStateSub?.cancel();
+    _blockSub?.cancel();
+    _animationController.dispose();
     _player.dispose();
     super.dispose();
+  }
+
+  void _handleContentRemoved() {
+    _player.stop();
+    final messenger = ScaffoldMessenger.of(context);
+    _animationController.reverse().then((_) {
+      if (mounted) {
+        Navigator.of(context).pop();
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'This response is no longer available',
+              style: GoogleFonts.spaceGrotesk(),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
   }
 
   Future<void> _loadAndPlay(int orderIdx, {bool play = true}) async {
     if (mounted) setState(() { _loadingUrl = true; _audioError = false; _position = Duration.zero; _duration = Duration.zero; });
     final item = widget.items[_order[orderIdx]];
+
+    _blockSub?.cancel();
+    _blockSub = FirebaseFirestore.instance
+        .collection('responses')
+        .doc(item.id)
+        .snapshots()
+        .listen((snap) {
+          if (!mounted) return;
+          final data = snap.data();
+          if (data != null && data['blocked'] == true) {
+            _handleContentRemoved();
+          }
+        });
 
     if (item.audioPath.isEmpty) {
       debugPrint('[STEWYRT][PLAYER] No audioPath for item ${item.id}');
@@ -455,162 +581,165 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> {
         ? (_position.inMilliseconds / _duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            width: 36, height: 4,
-            decoration: BoxDecoration(color: handle, borderRadius: BorderRadius.circular(2)),
-          ),
-          const SizedBox(height: 24),
-
-          // Tag chips — tap any to jump to Resonance and focus that synapse
-          Row(
-            children: [
-              Expanded(child: _Chip(label: 'TONE',    value: item.tone,    bg: chip, fg: fg, sub: sub,
-                onTap: item.tone.isEmpty ? null : () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop();
-                  ResonanceController.goToResonanceAndFocus(item.tone, pollId: widget.pollId);
-                },
-              )),
-              const SizedBox(width: 8),
-              Expanded(child: _Chip(label: 'FLAVOR',  value: item.flavor,  bg: chip, fg: fg, sub: sub,
-                onTap: item.flavor.isEmpty ? null : () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop();
-                  ResonanceController.goToResonanceAndFocus(item.flavor, pollId: widget.pollId);
-                },
-              )),
-              const SizedBox(width: 8),
-              Expanded(child: _Chip(label: 'ESSENCE', value: item.essence, bg: chip, fg: fg, sub: sub,
-                onTap: item.essence.isEmpty ? null : () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop();
-                  ResonanceController.goToResonanceAndFocus(item.essence, pollId: widget.pollId);
-                },
-              )),
-            ],
-          ),
-          const SizedBox(height: 18),
-
-          // Summary
-          Text(
-            '"${item.summary}"',
-            textAlign: TextAlign.center,
-            style: GoogleFonts.spaceGrotesk(
-              fontSize: 17, fontWeight: FontWeight.w500,
-              fontStyle: FontStyle.italic, color: fg, height: 1.4,
+    return FadeTransition(
+      opacity: _animationController,
+      child: Container(
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: handle, borderRadius: BorderRadius.circular(2)),
             ),
-          ),
-          const SizedBox(height: 20),
+            const SizedBox(height: 24),
 
-          // Progress slider
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              trackHeight: 2,
-              thumbShape:   const RoundSliderThumbShape(enabledThumbRadius: 5),
-              overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              activeTrackColor:   fg,
-              inactiveTrackColor: sub.withValues(alpha: 0.2),
-              thumbColor:         fg,
-              overlayColor:       fg.withValues(alpha: 0.08),
-            ),
-            child: Slider(
-              value: progress,
-              onChanged: _duration.inMilliseconds > 0
-                  ? (v) => _player.seek(
-                      Duration(milliseconds: (v * _duration.inMilliseconds).round()))
-                  : null,
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Tag chips — tap any to jump to Resonance and focus that synapse
+            Row(
               children: [
-                Text(_fmt(_position), style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub)),
-                Text(_fmt(_duration), style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub)),
+                Expanded(child: _Chip(label: 'TONE',    value: item.tone,    bg: chip, fg: fg, sub: sub,
+                  onTap: item.tone.isEmpty ? null : () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).pop();
+                    ResonanceController.goToResonanceAndFocus(item.tone, pollId: widget.pollId);
+                  },
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: _Chip(label: 'FLAVOR',  value: item.flavor,  bg: chip, fg: fg, sub: sub,
+                  onTap: item.flavor.isEmpty ? null : () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).pop();
+                    ResonanceController.goToResonanceAndFocus(item.flavor, pollId: widget.pollId);
+                  },
+                )),
+                const SizedBox(width: 8),
+                Expanded(child: _Chip(label: 'ESSENCE', value: item.essence, bg: chip, fg: fg, sub: sub,
+                  onTap: item.essence.isEmpty ? null : () {
+                    HapticFeedback.lightImpact();
+                    Navigator.of(context).pop();
+                    ResonanceController.goToResonanceAndFocus(item.essence, pollId: widget.pollId);
+                  },
+                )),
               ],
             ),
-          ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 18),
 
-          // Transport controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // Shuffle
-              IconButton(
-                icon: Icon(Icons.shuffle_rounded, size: 22,
-                    color: _shuffle ? fg : sub.withValues(alpha: 0.5)),
-                onPressed: _toggleShuffle,
+            // Summary
+            Text(
+              '"${item.summary}"',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.spaceGrotesk(
+                fontSize: 17, fontWeight: FontWeight.w500,
+                fontStyle: FontStyle.italic, color: fg, height: 1.4,
               ),
-              // Previous
-              IconButton(
-                icon: Icon(Icons.skip_previous_rounded, size: 34, color: fg),
-                onPressed: _goPrev,
+            ),
+            const SizedBox(height: 20),
+
+            // Progress slider
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 2,
+                thumbShape:   const RoundSliderThumbShape(enabledThumbRadius: 5),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
+                activeTrackColor:   fg,
+                inactiveTrackColor: sub.withValues(alpha: 0.2),
+                thumbColor:         fg,
+                overlayColor:       fg.withValues(alpha: 0.08),
               ),
-              // Play / pause
-              if (_loadingUrl)
-                SizedBox(
-                  width: 56, height: 56,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: fg),
-                )
-              else if (_audioError)
-                Container(
-                  width: 56, height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF3B30).withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.mic_off_rounded,
-                      color: Color(0xFFFF3B30), size: 24),
-                )
-              else
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    _isPlaying ? _player.pause() : _player.play();
-                  },
-                  child: Container(
+              child: Slider(
+                value: progress,
+                onChanged: _duration.inMilliseconds > 0
+                    ? (v) => _player.seek(
+                        Duration(milliseconds: (v * _duration.inMilliseconds).round()))
+                    : null,
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(_fmt(_position), style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub)),
+                  Text(_fmt(_duration), style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Transport controls
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Shuffle
+                IconButton(
+                  icon: Icon(Icons.shuffle_rounded, size: 22,
+                      color: _shuffle ? fg : sub.withValues(alpha: 0.5)),
+                  onPressed: _toggleShuffle,
+                ),
+                // Previous
+                IconButton(
+                  icon: Icon(Icons.skip_previous_rounded, size: 34, color: fg),
+                  onPressed: _goPrev,
+                ),
+                // Play / pause
+                if (_loadingUrl)
+                  SizedBox(
                     width: 56, height: 56,
-                    decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
-                    child: Icon(
-                      _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      color: bg, size: 30,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+                  )
+                else if (_audioError)
+                  Container(
+                    width: 56, height: 56,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF3B30).withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.mic_off_rounded,
+                        color: Color(0xFFFF3B30), size: 24),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      _isPlaying ? _player.pause() : _player.play();
+                    },
+                    child: Container(
+                      width: 56, height: 56,
+                      decoration: BoxDecoration(color: fg, shape: BoxShape.circle),
+                      child: Icon(
+                        _isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        color: bg, size: 30,
+                      ),
                     ),
                   ),
+                // Next
+                IconButton(
+                  icon: Icon(Icons.skip_next_rounded, size: 34, color: fg),
+                  onPressed: _goNext,
                 ),
-              // Next
-              IconButton(
-                icon: Icon(Icons.skip_next_rounded, size: 34, color: fg),
-                onPressed: _goNext,
-              ),
-              // Repeat all
-              IconButton(
-                icon: Icon(Icons.repeat_rounded, size: 22,
-                    color: _repeatAll ? fg : sub.withValues(alpha: 0.5)),
-                onPressed: _toggleRepeat,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
+                // Repeat all
+                IconButton(
+                  icon: Icon(Icons.repeat_rounded, size: 22,
+                      color: _repeatAll ? fg : sub.withValues(alpha: 0.5)),
+                  onPressed: _toggleRepeat,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
 
-          // Question context
-          Text(
-            item.question,
-            textAlign: TextAlign.center,
-            style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub, height: 1.5),
-          ),
-        ],
+            // Question context
+            Text(
+              item.question,
+              textAlign: TextAlign.center,
+              style: GoogleFonts.spaceGrotesk(fontSize: 11, color: sub, height: 1.5),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -672,8 +801,8 @@ class _Chip extends StatelessWidget {
 // ── Report sheet ──────────────────────────────────────────────────────────────
 
 class _ReportSheet extends StatefulWidget {
-  final String responseId;
-  const _ReportSheet({required this.responseId});
+  final ResponseItem item;
+  const _ReportSheet({required this.item});
 
   @override
   State<_ReportSheet> createState() => _ReportSheetState();
@@ -683,12 +812,29 @@ class _ReportSheetState extends State<_ReportSheet> {
   bool _showReasons = false;
   bool _submitting  = false;
   bool _submitted   = false;
+  bool _deleting    = false;
 
   static const _reasons = [
-    'Harmful or abusive content',
-    'Spam or fake',
-    'Other',
+    'harassment',
+    'hate_speech',
+    'spam',
+    'other',
   ];
+
+  String _getReasonLabel(String reason) {
+    switch (reason) {
+      case 'harassment':
+        return 'Harassment or abuse';
+      case 'hate_speech':
+        return 'Hate speech';
+      case 'spam':
+        return 'Spam or fake';
+      case 'other':
+        return 'Other';
+      default:
+        return reason;
+    }
+  }
 
   Future<void> _submit(String reason) async {
     final nav = Navigator.of(context);
@@ -696,7 +842,7 @@ class _ReportSheetState extends State<_ReportSheet> {
     try {
       await FirebaseFunctions.instance
           .httpsCallable('submitContentReport')
-          .call({'responseId': widget.responseId, 'reason': reason});
+          .call({'responseId': widget.item.id, 'reason': reason});
       if (!mounted) return;
       setState(() { _submitting = false; _submitted = true; });
       await Future.delayed(const Duration(milliseconds: 900));
@@ -704,6 +850,42 @@ class _ReportSheetState extends State<_ReportSheet> {
     } catch (e) {
       debugPrint('[STEWYRT][REPORT] submitContentReport failed: $e');
       if (mounted) nav.pop();
+    }
+  }
+
+  Future<void> _deleteResponse() async {
+    final nav = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    setState(() => _deleting = true);
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('deleteOwnResponse')
+          .call({'responseId': widget.item.id});
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Your response has been removed',
+              style: GoogleFonts.spaceGrotesk(),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        nav.pop();
+      }
+    } catch (e) {
+      debugPrint('[STEWYRT][REPORT] deleteOwnResponse failed: $e');
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to remove response. Please try again.',
+              style: GoogleFonts.spaceGrotesk(),
+            ),
+          ),
+        );
+        setState(() => _deleting = false);
+      }
     }
   }
 
@@ -757,6 +939,17 @@ class _ReportSheetState extends State<_ReportSheet> {
               style: GoogleFonts.spaceGrotesk(fontSize: 14, color: sub),
             ),
             const SizedBox(height: 8),
+          ] else if (_deleting) ...[
+            SizedBox(
+              width: 28, height: 28,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: fg),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Removing response...',
+              style: GoogleFonts.spaceGrotesk(fontSize: 14, color: sub),
+            ),
+            const SizedBox(height: 8),
           ] else if (!_showReasons) ...[
             Text(
               'OPTIONS',
@@ -765,6 +958,16 @@ class _ReportSheetState extends State<_ReportSheet> {
                   color: sub, letterSpacing: 1.8),
             ),
             const SizedBox(height: 16),
+            if (widget.item.uid.isNotEmpty &&
+                widget.item.uid == FirebaseAuth.instance.currentUser?.uid)
+              _SheetRow(
+                label: 'Remove my response',
+                fg: fg, border: border,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _deleteResponse();
+                },
+              ),
             _SheetRow(
               label: 'Report this response',
               fg: Colors.redAccent, border: border,
@@ -786,7 +989,7 @@ class _ReportSheetState extends State<_ReportSheet> {
             ),
             const SizedBox(height: 20),
             ..._reasons.map((r) => _SheetRow(
-              label: r,
+              label: _getReasonLabel(r),
               fg: fg, border: border,
               onTap: () { HapticFeedback.lightImpact(); _submit(r); },
             )),

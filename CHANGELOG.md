@@ -5,6 +5,25 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — UGC safety compliance
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Updated in-app content reporting reasons to exactly match server-side keys (`harassment`, `hate_speech`, `spam`, `other`). Added display mappings to preserve user-friendly UI text.
+  - Implemented per-response self-deletion ('Remove my response') for items created by the currently authenticated user.
+  - Set up a real-time Firestore document listener in the feed player sheet to automatically stop playback and pop the sheet with a smooth 800ms fade-out animation if the playing item gets blocked.
+  - Converted the live feed from a standard list to an `AnimatedList` with real-time diff-based synchronization and 600ms fade-out item exits.
+- **`functions/src/index.ts`**:
+  - Rewrote `submitContentReport` with a 3-strikes automated moderation system. If a response is reported for hate speech or harassment, it is instantly blocked, a strike is logged in `user_strikes`, and reaching 3 strikes places the user in `blocked_uids` and bulk-blocks all their posts.
+  - Updated `analyzeAudio` to check `blocked_uids` at start and silently exit/delete the storage file.
+  - Created admin moderation Cloud Functions: `approveModerationReport` and `dismissModerationReport`.
+  - Created `deleteOwnResponse` to let users hide/delete their own responses without penalty.
+- **`web/terms.html`**:
+  - Added Zero Tolerance Policy highlight box and Section 6a Content Removal Rights.
+- **`web/support.html`**:
+  - Built a new Help Center & FAQ page matching the design language of `child-safety.html`.
+
+---
+
 ## [2026-06-03] — Chore: add ITSAppUsesNonExemptEncryption to Info.plist
 
 - **`ios/Runner/Info.plist`**: Added `ITSAppUsesNonExemptEncryption` set to `false` to declare standard OS encryption usage to Apple.

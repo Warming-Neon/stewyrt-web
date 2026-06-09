@@ -65,13 +65,14 @@ stewyrt/
 │   ├── brain_visualizer.html             — Self-contained Three.js 3D brain (The Resonance)
 │   ├── privacy.html                      — Privacy & Ethical Usage Policy (GDPR/UK PECR compliant, ICO ZC142846)
 │   ├── terms.html                        — Terms of Service (England & Wales, 18+ gate)
+│   ├── support.html                      — Help Center & FAQs (Space Grotesk theme)
 │   ├── index.html                        — Flutter web bootstrap (generated)
 │   ├── manifest.json                     — PWA manifest (generated)
 │   ├── favicon.png
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, activateDailyQuestion, activateDailyQuestionManual
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, approveModerationReport, dismissModerationReport, deleteOwnResponse, activateDailyQuestion, activateDailyQuestionManual
 │
 ├── scripts/
 │   ├── seed_questions.js                 — Idempotent seed: populates questions collection; uses ../functions/node_modules/firebase-admin
@@ -365,16 +366,37 @@ One document per phrase. Seeded by `scripts/seed_waiting_phrases.js`.
 | `act` | String | `"setup"` / `"observation"` / `"empathy"` / `"technical"` |
 | `active` | Boolean | Only `active == true` docs are fetched |
 
-### `content_reports` collection
-Created by `submitContentReport` callable (Admin SDK). No client read/write access.
+### `moderation_queue` collection
+Created by `submitContentReport` callable. Contains incoming content reports.
 
 | Field | Type | Notes |
 |-------|------|-------|
 | `responseId` | String | UUID v4 of the reported response |
 | `reason` | String | One of: `harassment` / `hate_speech` / `spam` / `misinformation` / `other` |
-| `reportedBy` | String | Firebase Auth UID of the reporter |
+| `reporterUid` | String | Firebase Auth UID of the reporter |
 | `reportedAt` | Timestamp | Server timestamp |
-| `reviewed` | Boolean | `false` on creation; set by admin tooling |
+| `targetUid` | String | Firebase Auth UID of the creator of the response |
+| `status` | String | `"pending"` / `"auto_approved"` / `"approved"` / `"dismissed"` |
+
+### `user_strikes` collection
+Stores strike history for users who submit policy-violating content.
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `strikes` | Number | Active strike count |
+| `firstStrike` | Timestamp | Timestamp of first strike |
+| `lastStrike` | Timestamp | Timestamp of most recent strike |
+| `strikeHistory` | Array | List of strike items: `{ responseId, reason, timestamp }` |
+
+### `blocked_uids` collection
+Stores UIDs of permanently blocked users (e.g. 3-strikes limit hit).
+
+| Field | Type | Notes |
+|-------|------|-------|
+| `uid` | String | Banned user's UID |
+| `bannedAt` | Timestamp | Banned date |
+| `reason` | String | `"three_strikes"` / `"ejected"` |
+| `strikeHistory` | Array | Copy of user's strikeHistory from `user_strikes` |
 
 ### Storage paths
 - `audio_uploads/<uuid>.m4a` — poll responses; retained **up to 120 days** then auto-purged
@@ -565,9 +587,47 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 **Logic:**
 1. Require authenticated caller (`request.auth`)
 2. Validate `responseId` (UUID v4 regex) and `reason` (allowlist: `harassment` / `hate_speech` / `spam` / `misinformation` / `other`)
-3. Rate-limit: count `content_reports` where `reportedBy == uid` and `reportedAt >= now − 1 hour`; reject with `resource-exhausted` if ≥ 10
+3. Rate-limit: count `moderation_queue` where `reporterUid == uid` and `reportedAt >= now − 1 hour`; reject with `resource-exhausted` if ≥ 10
 4. Verify `responses/{responseId}` exists (reject `not-found` if absent)
-5. Write `{ responseId, reason, reportedBy, reportedAt: serverTimestamp(), reviewed: false }` to `content_reports/{autoId}`
+5. If reason is AUTO-APPROVE (`hate_speech`, `harassment`):
+   - Block response, update status to `auto_approved` in `moderation_queue`
+   - Log strike to `user_strikes`
+   - If strikes reach 3, add user to `blocked_uids` and bulk-block all responses for user
+6. Otherwise, log report with status `pending` to `moderation_queue`
+
+---
+
+### `approveModerationReport` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Verify authenticated caller matches hardcoded `ADMIN_UID`
+2. Block target response in `responses` and update status to `approved` in `moderation_queue`
+3. Log strike to `user_strikes`
+4. If `ejectUser == true` or strikes reaches 3, add user to `blocked_uids` and bulk-block all responses for user
+
+---
+
+### `dismissModerationReport` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Verify authenticated caller matches hardcoded `ADMIN_UID`
+2. Update status to `dismissed` in `moderation_queue`
+
+---
+
+### `deleteOwnResponse` — Callable function
+
+**Trigger:** `onCall` (HTTPS callable)
+
+**Logic:**
+1. Require authenticated caller (`request.auth`)
+2. Validate `responseId` is valid UUID v4
+3. Verify response exists and its `uid` field matches the caller's UID
+4. Mark response document as `blocked: true` and `deletedByUser: true`
 
 ---
 

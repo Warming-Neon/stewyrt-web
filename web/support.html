@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support & FAQs | Stewyrt</title>
+  <meta name="description" content="Help center and frequently asked questions for Stewyrt. Get answers about verification, privacy, content deletion, and how to contact support.">
+  <link rel="canonical" href="https://stewyrt.com/support">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #0A0A0A;
+      --surface-2: #111111;
+      --text: #F5F5F5;
+      --muted: #AAAAAA;
+      --border: #1A1A1A;
+      --accent: #00e5c0;
+      --warning: #f0c040;
+      --danger: #ff4444;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 400;
+      line-height: 1.7;
+    }
+
+    nav {
+      padding: 1.25rem 4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.9);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-brand img { height: 28px; }
+
+    .nav-brand span {
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    nav a.back {
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-decoration: none;
+      letter-spacing: 0.08em;
+    }
+
+    nav a.back:hover { color: var(--text); }
+
+    main {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 4rem 2rem 6rem;
+    }
+
+    .page-header {
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .page-header .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(0,229,192,0.3);
+      padding: 0.3rem 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .page-header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+
+    .page-header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .toc {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      margin-bottom: 3rem;
+    }
+
+    .toc h3 {
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+
+    .toc ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .toc ul a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.88rem;
+      transition: color 0.2s;
+    }
+
+    .toc ul a:hover { color: var(--accent); }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    section h2 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+    }
+
+    .faq-item {
+      margin-bottom: 1.8rem;
+    }
+
+    .faq-item h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .faq-item p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 0;
+    }
+
+    section p {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+    }
+
+    section p strong { color: var(--text); }
+
+    section ul {
+      list-style: none;
+      padding: 0;
+      margin: 1rem 0;
+    }
+
+    section ul li {
+      color: var(--muted);
+      font-size: 0.95rem;
+      padding: 0.4rem 0 0.4rem 1.25rem;
+      position: relative;
+    }
+
+    section ul li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-size: 0.8rem;
+    }
+
+    .callout {
+      border-left: 2px solid var(--accent);
+      background: rgba(0,229,192,0.04);
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .callout.warning {
+      border-color: var(--warning);
+      background: rgba(240,192,64,0.04);
+    }
+
+    .callout.danger {
+      border-color: var(--danger);
+      background: rgba(255,68,68,0.04);
+    }
+
+    .callout p {
+      margin: 0;
+      font-size: 0.9rem;
+    }
+
+    .callout strong { color: var(--text); }
+
+    .contact-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2rem;
+      margin-top: 1.5rem;
+    }
+
+    .contact-box .label {
+      font-size: 0.7rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .contact-box .value {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 1.25rem;
+    }
+
+    .contact-box a { color: var(--accent); text-decoration: none; }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    footer p { font-size: 0.78rem; color: var(--muted); }
+
+    footer a { color: var(--muted); text-decoration: none; }
+    footer a:hover { color: var(--text); }
+
+    @media (max-width: 600px) {
+      nav { padding: 1rem 1.25rem; }
+      main { padding: 2rem 1.25rem 4rem; }
+      footer { padding: 1.5rem 1.25rem; flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a href="/" class="nav-brand">
+      <img src="/assets/logo.svg" alt="Stewyrt">
+      <span>Stewyrt</span>
+    </a>
+    <a href="/" class="back">← Back to Stewyrt</a>
+  </nav>
+
+  <main>
+    <div class="page-header">
+      <div class="badge">Support & FAQs</div>
+      <h1>Help Center</h1>
+      <p>Need assistance or have questions? Get answers or contact the Stewyrt support team.</p>
+    </div>
+
+    <div class="toc">
+      <h3>Contents</h3>
+      <ul>
+        <li><a href="#getting-help">1. Getting Help</a></li>
+        <li><a href="#faqs">2. Frequently Asked Questions</a></li>
+        <li><a href="#contact">3. Contact Support</a></li>
+        <li><a href="#report-problem">4. Report a Problem</a></li>
+      </ul>
+    </div>
+
+    <section id="getting-help">
+      <h2>1. Getting Help</h2>
+      <p>Stewyrt is an anonymous audio sentiment platform. Because there are no traditional user accounts or profiles, getting help is simple. Most common questions and technical queries are answered in our FAQ section below.</p>
+      <div class="callout">
+        <p><strong>Quick Help:</strong> If your question is not covered in the FAQs, you can reach out directly to our support team at <a href="mailto:support@stewyrt.com">support@stewyrt.com</a>. We generally respond within 24 hours.</p>
+      </div>
+    </section>
+
+    <section id="faqs">
+      <h2>2. Frequently Asked Questions</h2>
+
+      <div class="faq-item">
+        <h3>What is Stewyrt?</h3>
+        <p>Stewyrt is a platform for anonymous audio sentiment. It aggregates short voice recordings from real humans in response to daily questions to track collective emotional trends (the Zeitgeist).</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How does the verification work?</h3>
+        <p>To prevent bots and keep the community authentic, we use an automated onboarding verification flow. It records a short audio sample and uses Google Gemini AI to verify it is a real human voice. This is entirely anonymous and no documents are required.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Is my voice stored?</h3>
+        <p>No. Your voice is used strictly to verify you are a human and to analyze the emotional tone of your response. <strong>All raw audio recordings are permanently deleted immediately after processing.</strong> We never keep archives of user voices.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Who can hear my response?</h3>
+        <p>Nobody hears your raw voice recording. Other users only see the emotional tags (tone, flavor, essence) and a brief 3-to-4 word summary of what you said generated by our AI.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How is my data used?</h3>
+        <p>The AI-derived emotional tags are aggregated into collective trends. Anonymised, aggregated trend data may be shared with academic researchers or public health organisations. No personal or identifying information is ever sold or shared.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Can I delete my responses?</h3>
+        <p>Yes. You can delete any response you have submitted at any time by long-pressing it in the feed and selecting <strong>'Remove my response'</strong>. Deletion is immediate and permanent.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>What happens if I report content?</h3>
+        <p>Reporting routes the response to a moderation queue for review. For zero-tolerance categories like harassment or hate speech, reported responses are immediately auto-blocked and hidden from the feed while our team reviews the reporter's claim.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>Why was my response removed?</h3>
+        <p>Submissions are automatically moderated or manually removed if they violate our Acceptable Use policy, which strictly prohibits threats of violence, hate speech, harassment, spam, and incitement to harm.</p>
+      </div>
+
+      <div class="faq-item">
+        <h3>How do I delete all my data?</h3>
+        <p>Because Stewyrt is fully anonymous and does not use sign-ups, we do not have user profile records. If you wish to purge all traces, you can delete your individual responses inside the app or email us at <a href="mailto:privacy@stewyrt.com">privacy@stewyrt.com</a> for manual assistance.</p>
+      </div>
+    </section>
+
+    <section id="contact">
+      <h2>3. Contact Support</h2>
+      <p>If you need to contact us directly, please reach out to the relevant email address below. We commit to responding to all queries within 24 hours.</p>
+      
+      <div class="contact-box">
+        <div class="label">General Queries</div>
+        <div class="value"><a href="mailto:support@stewyrt.com">support@stewyrt.com</a></div>
+
+        <div class="label">Privacy & Data Requests</div>
+        <div class="value"><a href="mailto:privacy@stewyrt.com">privacy@stewyrt.com</a></div>
+
+        <div class="label">Child Safety Concerns</div>
+        <div class="value"><a href="mailto:hello@warmingneon.com">hello@warmingneon.com</a></div>
+
+        <div class="label">Response Target</div>
+        <div class="value">All inquiries are processed within 24 hours.</div>
+      </div>
+    </section>
+
+    <section id="report-problem">
+      <h2>4. Report a Problem</h2>
+      <p>If you encounter offensive content, technical bugs, or other issues on Stewyrt, please report them using one of the channels below:</p>
+      <ul>
+        <li><strong>In-app reporting:</strong> Long-press any response item directly in the live feed to report it.</li>
+        <li><strong>By email:</strong> Send details of the issue to <a href="mailto:support@stewyrt.com">support@stewyrt.com</a>.</li>
+        <li><strong>Child safety reporting:</strong> Contact us immediately at <a href="mailto:hello@warmingneon.com">hello@warmingneon.com</a> for any child safety matters. We respond 24/7.</li>
+      </ul>
+      <div class="callout warning">
+        <p><strong>Abuse Prevention:</strong> In-app reporting is monitored. Repeated fake or malicious reports may result in rate limiting or temporary suspension from submitting responses.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>&copy; 2026 Warming Neon Ltd. All rights reserved.</p>
+    <p>
+      <a href="/privacy.html">Privacy Policy</a> &nbsp;·&nbsp;
+      <a href="/terms.html">Terms of Service</a> &nbsp;·&nbsp;
+      <a href="/child-safety.html">Child Safety</a> &nbsp;·&nbsp;
+      <a href="mailto:hello@warmingneon.com">Contact</a>
+    </p>
+  </footer>
+
+</body>
+</html>
