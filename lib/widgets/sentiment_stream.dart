@@ -250,7 +250,6 @@ class _SentimentStreamState extends State<SentimentStream> {
       backgroundColor: Colors.transparent,
       builder: (_) => _ReportSheet(item: item),
     ).then((result) {
-      debugPrint('[REPORT DEBUG] sheet closed with result: $result');
       if (result == true) {
         if (mounted) {
           setState(() {
@@ -908,16 +907,11 @@ class _ReportSheetState extends State<_ReportSheet> {
       if (result.data is Map) {
         isPersonalBlock = (result.data['personalBlock'] == true);
       }
-      debugPrint('[REPORT DEBUG] result.data: ${result.data}');
-      debugPrint('[REPORT DEBUG] isPersonalBlock: $isPersonalBlock');
 
       if (!mounted) return;
       setState(() { _submitting = false; _submitted = true; });
       await Future.delayed(const Duration(milliseconds: 900));
-      if (mounted) {
-        nav.pop(isPersonalBlock);
-        debugPrint('[REPORT DEBUG] popped with: $isPersonalBlock');
-      }
+      if (mounted) nav.pop(isPersonalBlock);
     } catch (e) {
       debugPrint('[STEWYRT][REPORT] submitContentReport failed: $e');
       if (mounted) nav.pop();
@@ -975,102 +969,104 @@ class _ReportSheetState extends State<_ReportSheet> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
       ),
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 48),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 36, height: 4,
-            decoration: BoxDecoration(color: handle, borderRadius: BorderRadius.circular(2)),
-          ),
-          const SizedBox(height: 24),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(color: handle, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 24),
 
-          if (_submitted) ...[
-            const Icon(Icons.check_circle_outline_rounded,
-                color: Color(0xFF3DDEC0), size: 40),
-            const SizedBox(height: 16),
-            Text(
-              'Report submitted',
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 16, fontWeight: FontWeight.w600, color: fg),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Thank you — our team will review this.',
-              style: GoogleFonts.spaceGrotesk(fontSize: 13, color: sub),
-            ),
-            const SizedBox(height: 8),
-          ] else if (_submitting) ...[
-            SizedBox(
-              width: 28, height: 28,
-              child: CircularProgressIndicator(strokeWidth: 1.5, color: fg),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Submitting...',
-              style: GoogleFonts.spaceGrotesk(fontSize: 14, color: sub),
-            ),
-            const SizedBox(height: 8),
-          ] else if (_deleting) ...[
-            SizedBox(
-              width: 28, height: 28,
-              child: CircularProgressIndicator(strokeWidth: 1.5, color: fg),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Removing response...',
-              style: GoogleFonts.spaceGrotesk(fontSize: 14, color: sub),
-            ),
-            const SizedBox(height: 8),
-          ] else if (!_showReasons) ...[
-            Text(
-              'OPTIONS',
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 11, fontWeight: FontWeight.w600,
-                  color: sub, letterSpacing: 1.8),
-            ),
-            const SizedBox(height: 16),
-            if (widget.item.uid.isNotEmpty &&
-                widget.item.uid == FirebaseAuth.instance.currentUser?.uid)
+            if (_submitted) ...[
+              const Icon(Icons.check_circle_outline_rounded,
+                  color: Color(0xFF3DDEC0), size: 40),
+              const SizedBox(height: 16),
+              Text(
+                'Report submitted',
+                style: GoogleFonts.spaceGrotesk(
+                    fontSize: 16, fontWeight: FontWeight.w600, color: fg),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Thank you — our team will review this.',
+                style: GoogleFonts.spaceGrotesk(fontSize: 13, color: sub),
+              ),
+              const SizedBox(height: 8),
+            ] else if (_submitting) ...[
+              SizedBox(
+                width: 28, height: 28,
+                child: CircularProgressIndicator(strokeWidth: 1.5, color: fg),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Submitting...',
+                style: GoogleFonts.spaceGrotesk(fontSize: 14, color: sub),
+              ),
+              const SizedBox(height: 8),
+            ] else if (_deleting) ...[
+              SizedBox(
+                width: 28, height: 28,
+                child: CircularProgressIndicator(strokeWidth: 1.5, color: fg),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Removing response...',
+                style: GoogleFonts.spaceGrotesk(fontSize: 14, color: sub),
+              ),
+              const SizedBox(height: 8),
+            ] else if (!_showReasons) ...[
+              Text(
+                'OPTIONS',
+                style: GoogleFonts.spaceGrotesk(
+                    fontSize: 11, fontWeight: FontWeight.w600,
+                    color: sub, letterSpacing: 1.8),
+              ),
+              const SizedBox(height: 16),
+              if (widget.item.uid.isNotEmpty &&
+                  widget.item.uid == FirebaseAuth.instance.currentUser?.uid)
+                _SheetRow(
+                  label: 'Remove my response',
+                  fg: fg, border: border,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _deleteResponse();
+                  },
+                ),
               _SheetRow(
-                label: 'Remove my response',
-                fg: fg, border: border,
+                label: 'Report this response',
+                fg: Colors.redAccent, border: border,
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  _deleteResponse();
+                  setState(() => _showReasons = true);
                 },
               ),
-            _SheetRow(
-              label: 'Report this response',
-              fg: Colors.redAccent, border: border,
-              onTap: () {
-                HapticFeedback.lightImpact();
-                setState(() => _showReasons = true);
-              },
-            ),
-            _SheetRow(
-              label: 'Cancel',
-              fg: fg, border: Colors.transparent,
-              onTap: () => Navigator.of(context).pop(),
-            ),
-          ] else ...[
-            Text(
-              'Why are you reporting this?',
-              style: GoogleFonts.spaceGrotesk(
-                  fontSize: 15, fontWeight: FontWeight.w600, color: fg),
-            ),
-            const SizedBox(height: 20),
-            ..._reasons.map((r) => _SheetRow(
-              label: _getReasonLabel(r),
-              fg: fg, border: border,
-              onTap: () { HapticFeedback.lightImpact(); _submit(r); },
-            )),
-            _SheetRow(
-              label: 'Back',
-              fg: sub, border: Colors.transparent,
-              onTap: () => setState(() => _showReasons = false),
-            ),
+              _SheetRow(
+                label: 'Cancel',
+                fg: fg, border: Colors.transparent,
+                onTap: () => Navigator.of(context).pop(),
+              ),
+            ] else ...[
+              Text(
+                'Why are you reporting this?',
+                style: GoogleFonts.spaceGrotesk(
+                    fontSize: 15, fontWeight: FontWeight.w600, color: fg),
+              ),
+              const SizedBox(height: 20),
+              ..._reasons.map((r) => _SheetRow(
+                label: _getReasonLabel(r),
+                fg: fg, border: border,
+                onTap: () { HapticFeedback.lightImpact(); _submit(r); },
+              )),
+              _SheetRow(
+                label: 'Back',
+                fg: sub, border: Colors.transparent,
+                onTap: () => setState(() => _showReasons = false),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

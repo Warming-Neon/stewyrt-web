@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Fix report sheet overflow & clean up debug prints
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Wrapped the `_ReportSheet` inner Column in a `SingleChildScrollView` to prevent visual overflow on smaller viewports.
+  - Removed all temporary `[REPORT DEBUG]` diagnostic debug logs.
+
+---
+
 ## [2026-06-09] — Rebuild report/block system as personal content filter
 
 - **`functions/src/index.ts`**:
