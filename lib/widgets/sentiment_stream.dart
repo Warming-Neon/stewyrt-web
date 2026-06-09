@@ -525,6 +525,7 @@ class _FeedPlayerSheetState extends State<_FeedPlayerSheet> with SingleTickerPro
   }
 
   void _handleContentRemoved() async {
+    // Removed temporary block debug prints
     if (!mounted) return;
     await _player.pause();
     if (!mounted) return;

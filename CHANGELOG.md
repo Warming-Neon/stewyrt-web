@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-09] — Remove block listener debug prints
+
+- **`lib/widgets/sentiment_stream.dart`**:
+  - Cleaned up temporary diagnostic `[BLOCK]` debugPrint statements from `_handleContentRemoved()`.
+
+---
+
 ## [2026-06-09] — Allow direct get reads on blocked responses in firestore.rules
 
 - **`firestore.rules`**:
