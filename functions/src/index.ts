@@ -1575,6 +1575,7 @@ export const activateDailyQuestionManual = onCall(async (request) => {
 export const sendDailyDigest = onSchedule(
   { schedule: "0 9 * * *", timeZone: "UTC", region: "us-central1" },
   async () => {
+    // v2
     const db = admin.firestore();
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
