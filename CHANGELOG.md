@@ -5,6 +5,16 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Add sendEveningPost Cloud Function and postToBuffer helper
+
+- **`functions/src/index.ts`**:
+  - Extracted the Buffer social posting logic into a shared `postToBuffer` helper function that formats morning/evening templates using the daily Pulse question, live user count, and hashtags.
+  - Updated `sendDailyDigest` to call `postToBuffer` for morning posts.
+  - Added `sendEveningPost` scheduled function configured to run daily at 14:00 UTC (in `us-central1`), fetching today's active question and users count and calling `postToBuffer` for evening posts.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Add Buffer social posting to daily digest
 
 - **`functions/src/index.ts`**:

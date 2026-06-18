@@ -72,7 +72,7 @@ stewyrt/
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, restoreResponse, approveModerationReport, dismissModerationReport, deleteOwnResponse, activateDailyQuestion, activateDailyQuestionManual, sendDailyDigest
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, restoreResponse, approveModerationReport, dismissModerationReport, deleteOwnResponse, activateDailyQuestion, activateDailyQuestionManual, sendDailyDigest, sendEveningPost
 │
 ├── scripts/
 │   ├── seed_questions.js                 — Idempotent seed: populates questions collection; uses ../functions/node_modules/firebase-admin
@@ -680,7 +680,28 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 2. Query Firestore database for key growth, engagement, and moderation counts (new users, total users, response counts, pending moderation reports, banned users).
 3. Query today's active Pulse question text from `polls` via `question_schedule`.
 4. Compose a plain text email digest with the metrics and email it directly to `wnltduk@gmail.com` using Gmail SMTP transporter (`GMAIL_USER` / `GMAIL_PASS` secrets).
-5. Post today's active Pulse question text to Buffer channels using Buffer's GraphQL API (`BUFFER_API_KEY` secret).
+5. Post today's active Pulse question to Buffer channels in morning format by calling the shared `postToBuffer` helper (uses `BUFFER_API_KEY` secret).
+
+---
+
+### `sendEveningPost` — Scheduled function
+
+**Schedule:** `onSchedule("0 14 * * *")` — daily at 14:00 UTC (Region: `us-central1`)
+
+**Logic:**
+1. Query today's active Pulse question text from `polls` via `question_schedule`.
+2. Query total users count from `users` collection.
+3. Post today's active Pulse question to Buffer channels in evening format by calling the shared `postToBuffer` helper (uses `BUFFER_API_KEY` secret).
+
+---
+
+### `postToBuffer` — Helper function
+
+**Logic:**
+Formats and publishes a daily post containing today's Pulse question to Instagram (`6a33ee5338b5579345abd627`), Bluesky (`6a33ef7c38b5579345abdd85`), and Threads (`6a33efe138b5579345abdfa9`) via Buffer's GraphQL API.
+- **Morning Format:** Formats as a morning question announcement with the live total user count and hashtags.
+- **Evening Format:** Formats as an evening reminder question with the live total user count and hashtags.
+- **Hashtags:** `#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`
 
 ---
 
