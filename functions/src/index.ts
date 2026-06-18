@@ -1679,7 +1679,7 @@ Open Admin: https://stewyrt.com/admin`;
 
     const mailOptions = {
       from: `"Stewyrt System" <${gmailUser}>`,
-      to: "social@stewyrt.com",
+      to: "wnltduk@gmail.com",
       subject: `Stewyrt Daily Digest — ${todayStr}`,
       text: emailBody,
     };
