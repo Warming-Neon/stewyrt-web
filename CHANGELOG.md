@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Use correct Buffer PostActionSuccess type
+
+- **`functions/src/index.ts`**: Replaced the GraphQL mutation query payload fields to target `PostActionSuccess` and `PostActionError` instead of `PostActionPayload` and `Error`.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Correct Buffer GraphQL mutation response type
 
 - **`functions/src/index.ts`**: Updated the response selection fields for the `createPost` mutation in `postToBuffer` helper to handle the `PostActionPayload` union wrapper and query error messages.

@@ -699,7 +699,7 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 
 **Logic:**
 Formats and publishes a daily post containing today's Pulse question to Instagram (`6a33ee5338b5579345abd627`), Bluesky (`6a33ef7c38b5579345abdd85`), and Threads (`6a33efe138b5579345abdfa9`) via Buffer's GraphQL API.
-- Uses the `createPost` mutation, requesting `post { id status }` on `PostActionPayload` and `message` on `Error`.
+- Uses the `createPost` mutation, requesting `post { id }` on `PostActionSuccess` and `message` on `PostActionError`.
 - **Morning Format:** Formats as a morning question announcement with the live total user count and hashtags.
 - **Evening Format:** Formats as an evening reminder question with the live total user count and hashtags.
 - **Hashtags:** `#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`
