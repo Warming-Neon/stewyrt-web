@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Correct Buffer GraphQL mutation response type
+
+- **`functions/src/index.ts`**: Updated the response selection fields for the `createPost` mutation in `postToBuffer` helper to handle the `PostActionPayload` union wrapper and query error messages.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Remove temporary comment from evening post template literal
 
 - **`functions/src/index.ts`**: Removed the temporary `// evening format` comment at the end of the evening `postText` string assignment.

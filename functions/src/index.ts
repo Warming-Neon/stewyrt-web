@@ -1604,9 +1604,14 @@ async function postToBuffer(questionText: string, isMorning: boolean, totalUsers
           query: `
             mutation CreatePost($input: CreatePostInput!) {
               createPost(input: $input) {
-                ... on Post {
-                  id
-                  status
+                ... on PostActionPayload {
+                  post {
+                    id
+                    status
+                  }
+                }
+                ... on Error {
+                  message
                 }
               }
             }

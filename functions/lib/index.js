@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.activateDailyQuestionManual = exports.activateDailyQuestion = exports.restoreResponse = exports.deleteOwnResponse = exports.dismissModerationReport = exports.approveModerationReport = exports.submitContentReport = exports.deleteUserData = exports.submitModerationReview = exports.scheduleUpcomingQuestionsManual = exports.scheduleUpcomingQuestions = exports.submitSelfReportedDemographics = exports.purgeOldSentimentAudio = exports.analyzeAudio = void 0;
+exports.sendEveningPost = exports.sendDailyDigest = exports.activateDailyQuestionManual = exports.activateDailyQuestion = exports.restoreResponse = exports.deleteOwnResponse = exports.dismissModerationReport = exports.approveModerationReport = exports.submitContentReport = exports.deleteUserData = exports.submitModerationReview = exports.scheduleUpcomingQuestionsManual = exports.scheduleUpcomingQuestions = exports.submitSelfReportedDemographics = exports.purgeOldSentimentAudio = exports.analyzeAudio = void 0;
 const admin = require("firebase-admin");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const nodemailer = require("nodemailer");
 const storage_1 = require("firebase-functions/v2/storage");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
@@ -1318,5 +1319,210 @@ exports.activateDailyQuestionManual = (0, https_1.onCall)(async (request) => {
         throw new https_1.HttpsError("unauthenticated", "Authentication required.");
     }
     return await runDailyActivation(admin.firestore());
+});
+// Shared helper to post to Buffer channels
+async function postToBuffer(questionText, isMorning, totalUsers) {
+    const bufferApiKey = process.env.BUFFER_API_KEY || "";
+    if (!bufferApiKey) {
+        console.error("[BUFFER] BUFFER_API_KEY not set.");
+        return;
+    }
+    let postText = "";
+    if (isMorning) {
+        postText = `💬 Today on Stewyrt:\n\n"${questionText}"\n\nJoin ${totalUsers} anonymous voices. Record yours at stewyrt.com\n\n#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`;
+    }
+    else {
+        postText = `🎙️ Have you answered today's question yet?\n\n"${questionText}"\n\n${totalUsers} anonymous voices and counting. stewyrt.com\n\n#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`;
+    }
+    const channelIds = [
+        "6a33ee5338b5579345abd627", // Instagram
+        "6a33ef7c38b5579345abdd85", // Bluesky
+        "6a33efe138b5579345abdfa9" // Threads
+    ];
+    for (const channelId of channelIds) {
+        try {
+            const bufferRes = await fetch("https://api.buffer.com/graphql", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${bufferApiKey}`
+                },
+                body: JSON.stringify({
+                    query: `
+            mutation CreatePost($input: CreatePostInput!) {
+              createPost(input: $input) {
+                ... on PostActionPayload {
+                  post {
+                    id
+                    status
+                  }
+                }
+                ... on Error {
+                  message
+                }
+              }
+            }
+          `,
+                    variables: {
+                        input: {
+                            channelId,
+                            content: {
+                                text: postText
+                            }
+                        }
+                    }
+                })
+            });
+            const bufferData = await bufferRes.json();
+            console.log(`[BUFFER] Posted to ${channelId} (isMorning: ${isMorning}):`, JSON.stringify(bufferData));
+        }
+        catch (err) {
+            console.error(`[BUFFER] Failed to post to ${channelId} (isMorning: ${isMorning}):`, err);
+        }
+    }
+}
+// Scheduled: daily at 09:00 UTC.
+exports.sendDailyDigest = (0, scheduler_1.onSchedule)({
+    schedule: "0 9 * * *",
+    timeZone: "UTC",
+    region: "us-central1",
+    secrets: ["GMAIL_USER", "GMAIL_PASS", "BUFFER_API_KEY"]
+}, async () => {
+    var _a, _b, _c;
+    // v2
+    const db = admin.firestore();
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    // Calculate time windows
+    const yesterday = admin.firestore.Timestamp.fromDate(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+    const last7days = admin.firestore.Timestamp.fromDate(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+    const last30days = admin.firestore.Timestamp.fromDate(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+    // Run count queries in parallel
+    const [newUsersTodaySnap, newUsers7dSnap, newUsers30dSnap, totalUsersSnap, responsesTodaySnap, totalResponsesSnap, pendingModerationSnap, bannedUsersSnap,] = await Promise.all([
+        db.collection("users").where("verifiedAt", ">=", yesterday).count().get(),
+        db.collection("users").where("verifiedAt", ">=", last7days).count().get(),
+        db.collection("users").where("verifiedAt", ">=", last30days).count().get(),
+        db.collection("users").count().get(),
+        db.collection("responses").where("createdAt", ">=", yesterday).where("blocked", "==", false).count().get(),
+        db.collection("responses").where("blocked", "==", false).count().get(),
+        db.collection("moderation_queue").where("status", "==", "pending").count().get(),
+        db.collection("blocked_uids").count().get(),
+    ]);
+    const newUsersToday = newUsersTodaySnap.data().count;
+    const newUsers7d = newUsers7dSnap.data().count;
+    const newUsers30d = newUsers30dSnap.data().count;
+    const totalUsers = totalUsersSnap.data().count;
+    const responsesToday = responsesTodaySnap.data().count;
+    const totalResponses = totalResponsesSnap.data().count;
+    const pendingModeration = pendingModerationSnap.data().count;
+    const bannedUsers = bannedUsersSnap.data().count;
+    // Fetch today's question
+    let questionText = "No active pulse question found for today";
+    const scheduleDoc = await db.collection("question_schedule").doc(todayStr).get();
+    if (scheduleDoc.exists) {
+        const pulseQuestionId = (_a = scheduleDoc.data()) === null || _a === void 0 ? void 0 : _a.pulse_question_id;
+        if (pulseQuestionId) {
+            const pollSnap = await db.collection("polls")
+                .where("questionId", "==", pulseQuestionId)
+                .limit(1)
+                .get();
+            if (!pollSnap.empty) {
+                questionText = ((_b = pollSnap.docs[0].data()) === null || _b === void 0 ? void 0 : _b.question) || "No question text";
+            }
+            else {
+                // Fallback check questions
+                const questionSnap = await db.collection("questions").doc(pulseQuestionId).get();
+                if (questionSnap.exists) {
+                    questionText = ((_c = questionSnap.data()) === null || _c === void 0 ? void 0 : _c.text) || "No question text";
+                }
+            }
+        }
+    }
+    // Build plain text email body
+    const emailBody = `STEWYRT DAILY DIGEST — ${todayStr}
+
+GROWTH
+New users today: ${newUsersToday}
+New users (7d): ${newUsers7d}
+New users (30d): ${newUsers30d}
+Total users: ${totalUsers}
+
+ENGAGEMENT
+Responses today: ${responsesToday}
+Total responses: ${totalResponses}
+
+TODAY'S PULSE QUESTION
+"${questionText}"
+
+MODERATION
+Pending reports: ${pendingModeration}
+Banned users: ${bannedUsers}
+
+---
+Open Admin: https://stewyrt.com/admin`;
+    // Transporter configuration using Gmail SMTP with placeholder fallbacks
+    const gmailUser = process.env.GMAIL_USER || "placeholder-user@gmail.com";
+    const gmailPass = process.env.GMAIL_PASS || "placeholder-pass";
+    const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+            user: gmailUser,
+            pass: gmailPass,
+        },
+    });
+    const mailOptions = {
+        from: `"Stewyrt System" <${gmailUser}>`,
+        to: "wnltduk@gmail.com",
+        subject: `Stewyrt Daily Digest — ${todayStr}`,
+        text: emailBody,
+    };
+    try {
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[DAILY DIGEST] Email sent successfully: ${info.messageId}`);
+    }
+    catch (error) {
+        console.error("[DAILY DIGEST] Failed to send email:", error);
+    }
+    // Call postToBuffer
+    await postToBuffer(questionText, true, totalUsers);
+});
+// Scheduled: daily at 14:00 UTC.
+exports.sendEveningPost = (0, scheduler_1.onSchedule)({
+    schedule: "0 14 * * *",
+    timeZone: "UTC",
+    region: "us-central1",
+    secrets: ["BUFFER_API_KEY"]
+}, async () => {
+    var _a, _b, _c;
+    const db = admin.firestore();
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+    // Fetch today's question
+    let questionText = "No active pulse question found for today";
+    const scheduleDoc = await db.collection("question_schedule").doc(todayStr).get();
+    if (scheduleDoc.exists) {
+        const pulseQuestionId = (_a = scheduleDoc.data()) === null || _a === void 0 ? void 0 : _a.pulse_question_id;
+        if (pulseQuestionId) {
+            const pollSnap = await db.collection("polls")
+                .where("questionId", "==", pulseQuestionId)
+                .limit(1)
+                .get();
+            if (!pollSnap.empty) {
+                questionText = ((_b = pollSnap.docs[0].data()) === null || _b === void 0 ? void 0 : _b.question) || "No question text";
+            }
+            else {
+                // Fallback check questions
+                const questionSnap = await db.collection("questions").doc(pulseQuestionId).get();
+                if (questionSnap.exists) {
+                    questionText = ((_c = questionSnap.data()) === null || _c === void 0 ? void 0 : _c.text) || "No question text";
+                }
+            }
+        }
+    }
+    // Fetch totalUsers count
+    const totalUsersSnap = await db.collection("users").count().get();
+    const totalUsers = totalUsersSnap.data().count;
+    // Call postToBuffer
+    await postToBuffer(questionText, false, totalUsers);
 });
 //# sourceMappingURL=index.js.map
