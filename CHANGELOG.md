@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Mount Gmail secrets into digest function env
+
+- **`functions/src/index.ts`**: Added `secrets: ["GMAIL_USER", "GMAIL_PASS"]` to `sendDailyDigest` scheduled function options to mount secrets as local environment variables.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Force daily digest function revision for secret refresh
 
 - **`functions/src/index.ts`**: Added `// v2` comment inside `sendDailyDigest` function body to force a new revision deployment.
