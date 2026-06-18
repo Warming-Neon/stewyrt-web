@@ -1571,6 +1571,65 @@ export const activateDailyQuestionManual = onCall(async (request) => {
   return await runDailyActivation(admin.firestore());
 });
 
+// Shared helper to post to Buffer channels
+async function postToBuffer(questionText: string, isMorning: boolean, totalUsers: number) {
+  const bufferApiKey = process.env.BUFFER_API_KEY || "";
+  if (!bufferApiKey) {
+    console.error("[BUFFER] BUFFER_API_KEY not set.");
+    return;
+  }
+
+  let postText = "";
+  if (isMorning) {
+    postText = `💬 Today on Stewyrt:\n\n"${questionText}"\n\nJoin ${totalUsers} anonymous voices. Record yours at stewyrt.com\n\n#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`;
+  } else {
+    postText = `🎙️ Have you answered today's question yet?\n\n"${questionText}"\n\n${totalUsers} anonymous voices and counting. stewyrt.com\n\n#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`;
+  }
+
+  const channelIds = [
+    "6a33ee5338b5579345abd627", // Instagram
+    "6a33ef7c38b5579345abdd85", // Bluesky
+    "6a33efe138b5579345abdfa9"  // Threads
+  ];
+
+  for (const channelId of channelIds) {
+    try {
+      const bufferRes = await fetch("https://api.buffer.com/graphql", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${bufferApiKey}`
+        },
+        body: JSON.stringify({
+          query: `
+            mutation CreatePost($input: CreatePostInput!) {
+              createPost(input: $input) {
+                ... on Post {
+                  id
+                  status
+                }
+              }
+            }
+          `,
+          variables: {
+            input: {
+              channelId,
+              content: {
+                text: postText
+              }
+            }
+          }
+        })
+      });
+      const bufferData = await bufferRes.json();
+      console.log(`[BUFFER] Posted to ${channelId} (isMorning: ${isMorning}):`, 
+        JSON.stringify(bufferData));
+    } catch (err) {
+      console.error(`[BUFFER] Failed to post to ${channelId} (isMorning: ${isMorning}):`, err);
+    }
+  }
+}
+
 // Scheduled: daily at 09:00 UTC.
 export const sendDailyDigest = onSchedule(
   { 
@@ -1691,51 +1750,51 @@ Open Admin: https://stewyrt.com/admin`;
       console.error("[DAILY DIGEST] Failed to send email:", error);
     }
 
-    const bufferApiKey = process.env.BUFFER_API_KEY || "";
+    // Call postToBuffer
+    await postToBuffer(questionText, true, totalUsers);
+  }
+);
 
-    const postText = `💬 Today on Stewyrt:\n\n"${questionText}"\n\nRecord your anonymous voice response at stewyrt.com`;
+// Scheduled: daily at 14:00 UTC.
+export const sendEveningPost = onSchedule(
+  { 
+    schedule: "0 14 * * *", 
+    timeZone: "UTC", 
+    region: "us-central1",
+    secrets: ["BUFFER_API_KEY"]
+  },
+  async () => {
+    const db = admin.firestore();
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
 
-    const channelIds = [
-      "6a33ee5338b5579345abd627",
-      "6a33ef7c38b5579345abdd85",
-      "6a33efe138b5579345abdfa9"
-    ];
-
-    for (const channelId of channelIds) {
-      try {
-        const bufferRes = await fetch("https://api.buffer.com/graphql", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${bufferApiKey}`
-          },
-          body: JSON.stringify({
-            query: `
-              mutation CreatePost($input: CreatePostInput!) {
-                createPost(input: $input) {
-                  ... on Post {
-                    id
-                    status
-                  }
-                }
-              }
-            `,
-            variables: {
-              input: {
-                channelId,
-                content: {
-                  text: postText
-                }
-              }
-            }
-          })
-        });
-        const bufferData = await bufferRes.json();
-        console.log(`[BUFFER] Posted to ${channelId}:`, 
-          JSON.stringify(bufferData));
-      } catch (err) {
-        console.error(`[BUFFER] Failed to post to ${channelId}:`, err);
+    // Fetch today's question
+    let questionText = "No active pulse question found for today";
+    const scheduleDoc = await db.collection("question_schedule").doc(todayStr).get();
+    if (scheduleDoc.exists) {
+      const pulseQuestionId = scheduleDoc.data()?.pulse_question_id;
+      if (pulseQuestionId) {
+        const pollSnap = await db.collection("polls")
+          .where("questionId", "==", pulseQuestionId)
+          .limit(1)
+          .get();
+        if (!pollSnap.empty) {
+          questionText = pollSnap.docs[0].data()?.question || "No question text";
+        } else {
+          // Fallback check questions
+          const questionSnap = await db.collection("questions").doc(pulseQuestionId).get();
+          if (questionSnap.exists) {
+            questionText = questionSnap.data()?.text || "No question text";
+          }
+        }
       }
     }
+
+    // Fetch totalUsers count
+    const totalUsersSnap = await db.collection("users").count().get();
+    const totalUsers = totalUsersSnap.data().count;
+
+    // Call postToBuffer
+    await postToBuffer(questionText, false, totalUsers);
   }
 );
