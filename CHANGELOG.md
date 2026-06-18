@@ -5,6 +5,18 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Add Firebase Analytics for session and retention tracking
+
+- **`pubspec.yaml`**: Added `firebase_analytics: ^11.3.3` dependency.
+- **`lib/main.dart`**:
+  - Imported `package:firebase_analytics/firebase_analytics.dart`.
+  - Initialized `FirebaseAnalytics.instance` inside `main()` after Firebase initialization.
+  - Enabled analytics collection explicitly.
+  - Made `analytics` parameter in `StewyrtApp` nullable and optional to preserve compatibility with widget tests.
+  - Added `FirebaseAnalyticsObserver(analytics: analytics)` to `navigatorObservers` in `MaterialApp` if `analytics` is initialized.
+
+---
+
 ## [2026-06-09] — Update all contact emails to social@stewyrt.com
 
 - **`web/privacy.html`, `web/support.html`, `web/child-safety.html`, `web/terms.html`**:

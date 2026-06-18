@@ -930,6 +930,7 @@ window.addEventListener('message', e => { processBrainData(typeof e.data === 'st
 | `firebase_auth ^5.0.0` | Anonymous auth |
 | `firebase_storage ^12.0.0` | Audio upload |
 | `firebase_core ^3.0.0` | Init |
+| `firebase_analytics ^11.3.3` | Session, screen view, and retention tracking |
 | `cloud_functions ^5.0.0` | Callable Cloud Functions (`submitSelfReportedDemographics`, `submitModerationReview`, `deleteUserData`, `submitContentReport`) |
 | `record ^5.1.2` | Mic recording (AAC-LC, 128kbps, 44.1kHz mono) |
 | `just_audio ^0.9.40` | Playback |
