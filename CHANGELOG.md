@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Hardcode admin UIDs, add Firestore admin read access
+
+- **`web/admin.html`**: Replaced `ADMIN_UID` string with `ADMIN_UIDS` array containing both admin UIDs; updated UID check to `ADMIN_UIDS.includes(user.uid)`.
+- **`firestore.rules`**: Added admin override `match /{document=**}` block before the catch-all, granting full read/write to both admin UIDs.
+- **Firebase Deploy**: Redeployed hosting and Firestore rules.
+
+---
+
 ## [2026-06-18] — Add schedulingType/mode to Buffer mutation; build admin UI
 
 - **`functions/src/index.ts`**: Fixed `postToBuffer` — replaced nested `content: { text }` with flat `text`, added `schedulingType: "automatic"` and `mode: "addToQueue"` fields to the Buffer GraphQL mutation input. Changed `PostActionError` to `MutationError` in the union type fragment.

@@ -390,7 +390,10 @@
       httpsCallable
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
-    const ADMIN_UID = "REPLACE_WITH_UID";
+    const ADMIN_UIDS = [
+      "4LRTJGllvUWd7lM76ZzOIfRBU863",
+      "qHXRYnA07POvdtXVMZY4dW9FrTg1"
+    ];
 
     const app = initializeApp({
       apiKey: "AIzaSyBOWqfIXjTUsw-_4XhlYjLm5hnonbzpqXs",
@@ -433,7 +436,7 @@
         return;
       }
       console.log("Signed in UID:", user.uid);
-      if (ADMIN_UID !== "REPLACE_WITH_UID" && user.uid !== ADMIN_UID) {
+      if (!ADMIN_UIDS.includes(user.uid)) {
         show("access-denied");
         return;
       }

@@ -118,6 +118,17 @@ service cloud.firestore {
       }
     }
 
+    // ── admin override ────────────────────────────────────────────────────────
+    // Grants full read/write to hardcoded admin UIDs for the admin portal.
+    // Must appear before the catch-all so Firestore evaluates it first.
+    match /{document=**} {
+      allow read, write: if request.auth != null &&
+        request.auth.uid in [
+          "4LRTJGllvUWd7lM76ZzOIfRBU863",
+          "qHXRYnA07POvdtXVMZY4dW9FrTg1"
+        ];
+    }
+
     // ── catch-all ──────────────────────────────────────────────────────────────
     // Any collection not explicitly named above is denied by default.
     // This covers future collections until rules are explicitly added.
