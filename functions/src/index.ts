@@ -1573,7 +1573,12 @@ export const activateDailyQuestionManual = onCall(async (request) => {
 
 // Scheduled: daily at 09:00 UTC.
 export const sendDailyDigest = onSchedule(
-  { schedule: "0 9 * * *", timeZone: "UTC", region: "us-central1" },
+  { 
+    schedule: "0 9 * * *", 
+    timeZone: "UTC", 
+    region: "us-central1",
+    secrets: ["GMAIL_USER", "GMAIL_PASS"]
+  },
   async () => {
     // v2
     const db = admin.firestore();
