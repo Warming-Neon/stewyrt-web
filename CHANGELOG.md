@@ -5,6 +5,15 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Add schedulingType/mode to Buffer mutation; build admin UI
+
+- **`functions/src/index.ts`**: Fixed `postToBuffer` — replaced nested `content: { text }` with flat `text`, added `schedulingType: "automatic"` and `mode: "addToQueue"` fields to the Buffer GraphQL mutation input. Changed `PostActionError` to `MutationError` in the union type fragment.
+- **`web/admin.html`**: Created single-file admin portal with Google Auth guard, Dashboard tab (growth/engagement/platform health metrics, today's question, 60s auto-refresh), and Operations tab (moderation queue with approve/dismiss, 14-day question schedule with reschedule trigger, restore response).
+- **`firebase.json`**: Added `/admin` → `/admin.html` hosting rewrite.
+- **Firebase Deploy**: Redeployed Cloud Functions and Hosting.
+
+---
+
 ## [2026-06-18] — Use correct Buffer PostActionSuccess type
 
 - **`functions/src/index.ts`**: Replaced the GraphQL mutation query payload fields to target `PostActionSuccess` and `PostActionError` instead of `PostActionPayload` and `Error`.

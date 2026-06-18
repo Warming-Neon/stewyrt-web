@@ -66,6 +66,7 @@ stewyrt/
 │   ├── privacy.html                      — Privacy & Ethical Usage Policy (GDPR/UK PECR compliant, ICO ZC142846)
 │   ├── terms.html                        — Terms of Service (England & Wales, 18+ gate)
 │   ├── support.html                      — Help Center & FAQs (Space Grotesk theme, social@stewyrt.com email contact)
+│   ├── admin.html                        — Admin portal: Google Auth guard (ADMIN_UID constant), Dashboard tab (metrics + today's question, 60s refresh), Operations tab (mod queue, 14-day schedule, restore response); Firebase JS SDK v10 CDN
 │   ├── index.html                        — Flutter web bootstrap (generated)
 │   ├── manifest.json                     — PWA manifest (generated)
 │   ├── favicon.png
@@ -93,7 +94,7 @@ stewyrt/
 ├── pubspec.yaml
 ├── analysis_options.yaml
 ├── geminiignore                           — Excludes sensitive paths from Gemini context
-└── firebase.json                          — Firebase configuration (hosting rewrites for support/privacy/terms/child-safety, caching headers, rules mapping)
+└── firebase.json                          — Firebase configuration (hosting rewrites for support/privacy/terms/child-safety/admin, caching headers, rules mapping)
 
 ---
 

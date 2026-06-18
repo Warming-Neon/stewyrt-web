@@ -1609,7 +1609,7 @@ async function postToBuffer(questionText: string, isMorning: boolean, totalUsers
                     id
                   }
                 }
-                ... on PostActionError {
+                ... on MutationError {
                   message
                 }
               }
@@ -1618,9 +1618,9 @@ async function postToBuffer(questionText: string, isMorning: boolean, totalUsers
           variables: {
             input: {
               channelId,
-              content: {
-                text: postText
-              }
+              text: postText,
+              schedulingType: "automatic",
+              mode: "addToQueue"
             }
           }
         })

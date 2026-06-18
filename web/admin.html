@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin | Stewyrt</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --surface: #0A0A0A;
+      --surface-2: #111111;
+      --text: #F5F5F5;
+      --muted: #AAAAAA;
+      --border: #1A1A1A;
+      --accent: #00e5c0;
+      --warning: #f0c040;
+      --danger: #ff4444;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 400;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* Auth screen */
+    #auth-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 2rem;
+    }
+
+    #auth-screen h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    #auth-screen p { color: var(--muted); }
+
+    .sign-in-btn {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.875rem 1.75rem;
+      border-radius: 8px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .sign-in-btn:hover { border-color: var(--accent); background: #111; }
+    .sign-in-btn svg { width: 20px; height: 20px; }
+
+    #access-denied {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 1rem;
+      text-align: center;
+    }
+    #access-denied h2 { color: var(--danger); font-size: 1.5rem; }
+    #access-denied p { color: var(--muted); }
+
+    /* Main layout */
+    #app { display: none; flex-direction: column; min-height: 100vh; }
+
+    nav {
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.95);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .nav-brand { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+    .nav-right { display: flex; align-items: center; gap: 1rem; }
+    .nav-email { color: var(--muted); font-size: 0.85rem; }
+
+    .sign-out-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .sign-out-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+    /* Tabs */
+    .tab-bar {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      background: var(--surface);
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--muted);
+      padding: 1rem 1.5rem;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+      margin-bottom: -1px;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-btn:hover:not(.active) { color: var(--text); }
+
+    .tab-panel { display: none; padding: 2rem; }
+    .tab-panel.active { display: block; }
+
+    /* Metrics grid */
+    .section-title {
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      margin-top: 2rem;
+    }
+    .section-title:first-child { margin-top: 0; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+
+    .metric-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .metric-value { font-size: 2rem; font-weight: 700; color: var(--text); }
+    .metric-value.accent { color: var(--accent); }
+
+    .last-updated { font-size: 0.75rem; color: var(--muted); margin-top: 1.5rem; }
+
+    /* Question card */
+    .question-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+    }
+    .question-card p { font-size: 1.05rem; color: var(--text); }
+
+    /* Operations sections */
+    .ops-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .ops-section h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1.25rem; color: var(--text); }
+
+    /* Moderation queue items */
+    .queue-item {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 0.75rem;
+      background: var(--surface-2);
+    }
+    .queue-item-meta { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+    .queue-item-meta span { font-size: 0.8rem; color: var(--muted); }
+    .queue-item-meta span strong { color: var(--text); font-weight: 500; }
+    .queue-item-actions { display: flex; gap: 0.5rem; }
+
+    .btn {
+      padding: 0.45rem 1.1rem;
+      border-radius: 6px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-approve { background: var(--accent); color: #000; }
+    .btn-dismiss { background: var(--surface); border: 1px solid var(--border); color: var(--muted); }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-secondary { background: var(--surface-2); border: 1px solid var(--border); color: var(--text); }
+
+    .empty-state { color: var(--muted); font-size: 0.9rem; padding: 0.5rem 0; }
+
+    /* Schedule table */
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    th { text-align: left; color: var(--muted); font-weight: 500; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+    td { padding: 0.65rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td.date-col { color: var(--muted); white-space: nowrap; font-size: 0.8rem; }
+    td.q-col { color: var(--text); }
+
+    /* Restore section */
+    .restore-row { display: flex; gap: 0.75rem; align-items: center; }
+    .restore-row input {
+      flex: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.55rem 0.875rem;
+      border-radius: 6px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 0.9rem;
+    }
+    .restore-row input:focus { outline: none; border-color: var(--accent); }
+    .restore-row input::placeholder { color: var(--muted); }
+
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem 1.25rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 999;
+      pointer-events: none;
+    }
+    #toast.show { opacity: 1; }
+    #toast.success { border-color: var(--accent); color: var(--accent); }
+    #toast.error { border-color: var(--danger); color: var(--danger); }
+  </style>
+</head>
+<body>
+
+  <!-- Auth screen -->
+  <div id="auth-screen">
+    <h1>stewyrt admin</h1>
+    <p>Sign in with your Google account to continue.</p>
+    <button class="sign-in-btn" onclick="signIn()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Sign in with Google
+    </button>
+  </div>
+
+  <!-- Access denied -->
+  <div id="access-denied">
+    <h2>Access Denied</h2>
+    <p>Your account is not authorised to access this page.</p>
+    <button class="sign-out-btn" style="margin-top:1rem" onclick="signOut()">Sign out</button>
+  </div>
+
+  <!-- Main app -->
+  <div id="app">
+    <nav>
+      <span class="nav-brand">stewyrt / admin</span>
+      <div class="nav-right">
+        <span class="nav-email" id="nav-email"></span>
+        <button class="sign-out-btn" onclick="signOut()">Sign out</button>
+      </div>
+    </nav>
+
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('dashboard', this)">Dashboard</button>
+      <button class="tab-btn" onclick="switchTab('operations', this)">Operations</button>
+    </div>
+
+    <!-- Dashboard tab -->
+    <div id="tab-dashboard" class="tab-panel active">
+
+      <div class="section-title">Growth</div>
+      <div class="metrics-grid">
+        <div class="metric-card"><div class="metric-label">Total users</div><div class="metric-value accent" id="m-total-users">—</div></div>
+        <div class="metric-card"><div class="metric-label">New today</div><div class="metric-value" id="m-new-today">—</div></div>
+        <div class="metric-card"><div class="metric-label">New this week</div><div class="metric-value" id="m-new-week">—</div></div>
+        <div class="metric-card"><div class="metric-label">New this month</div><div class="metric-value" id="m-new-month">—</div></div>
+      </div>
+
+      <div class="section-title">Engagement</div>
+      <div class="metrics-grid">
+        <div class="metric-card"><div class="metric-label">Total responses</div><div class="metric-value accent" id="m-total-responses">—</div></div>
+        <div class="metric-card"><div class="metric-label">Responses today</div><div class="metric-value" id="m-responses-today">—</div></div>
+      </div>
+
+      <div class="section-title">Platform Health</div>
+      <div class="metrics-grid">
+        <div class="metric-card"><div class="metric-label">Pending moderation</div><div class="metric-value" id="m-pending-mod">—</div></div>
+        <div class="metric-card"><div class="metric-label">Active bans</div><div class="metric-value" id="m-active-bans">—</div></div>
+        <div class="metric-card"><div class="metric-label">Users with strikes</div><div class="metric-value" id="m-user-strikes">—</div></div>
+      </div>
+
+      <div class="section-title">Today's Question</div>
+      <div class="question-card"><p id="m-todays-question">Loading…</p></div>
+
+      <div class="last-updated">Last updated: <span id="last-updated-time">—</span></div>
+    </div>
+
+    <!-- Operations tab -->
+    <div id="tab-operations" class="tab-panel">
+
+      <!-- Moderation Queue -->
+      <div class="ops-section">
+        <h3>Moderation Queue</h3>
+        <div id="mod-queue-list"><div class="empty-state">Loading…</div></div>
+      </div>
+
+      <!-- Question Schedule -->
+      <div class="ops-section">
+        <h3>Question Schedule — Next 14 Days</h3>
+        <div id="schedule-table-wrap"><div class="empty-state">Loading…</div></div>
+        <button class="btn btn-secondary" style="margin-top:1rem" onclick="reschedule()">Reschedule from today</button>
+      </div>
+
+      <!-- Restore Response -->
+      <div class="ops-section">
+        <h3>Restore Response</h3>
+        <div class="restore-row">
+          <input type="text" id="restore-input" placeholder="Response ID (UUID)">
+          <button class="btn btn-primary" onclick="restoreResponse()">Restore</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut as fbSignOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+    import {
+      getFirestore,
+      collection,
+      doc,
+      getDoc,
+      getDocs,
+      query,
+      where,
+      orderBy,
+      limit,
+      getCountFromServer,
+      Timestamp
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+    import {
+      getFunctions,
+      httpsCallable
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
+
+    const ADMIN_UID = "REPLACE_WITH_UID";
+
+    const app = initializeApp({
+      apiKey: "AIzaSyBOWqfIXjTUsw-_4XhlYjLm5hnonbzpqXs",
+      authDomain: "stewyrt-11.firebaseapp.com",
+      projectId: "stewyrt-11",
+      storageBucket: "stewyrt-11.firebasestorage.app",
+      messagingSenderId: "9105005440",
+      appId: "1:9105005440:web:a2fa53b537e6600ebe7f65"
+    });
+
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const fns = getFunctions(app, "us-central1");
+
+    let refreshInterval = null;
+
+    // Expose to global scope for onclick handlers
+    window.signIn = async () => {
+      const provider = new GoogleAuthProvider();
+      try { await signInWithPopup(auth, provider); }
+      catch (e) { showToast("Sign-in failed: " + e.message, "error"); }
+    };
+
+    window.signOut = async () => {
+      clearInterval(refreshInterval);
+      await fbSignOut(auth);
+    };
+
+    window.switchTab = (name, btn) => {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      document.getElementById("tab-" + name).classList.add("active");
+      if (name === "operations") loadOperations();
+    };
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        show("auth-screen");
+        return;
+      }
+      console.log("Signed in UID:", user.uid);
+      if (ADMIN_UID !== "REPLACE_WITH_UID" && user.uid !== ADMIN_UID) {
+        show("access-denied");
+        return;
+      }
+      document.getElementById("nav-email").textContent = user.email;
+      show("app");
+      await loadDashboard();
+      clearInterval(refreshInterval);
+      refreshInterval = setInterval(loadDashboard, 60_000);
+    });
+
+    function show(id) {
+      ["auth-screen", "access-denied", "app"].forEach(s => {
+        const el = document.getElementById(s);
+        el.style.display = (s === id) ? (s === "app" ? "flex" : "flex") : "none";
+      });
+    }
+
+    async function countQuery(col, ...constraints) {
+      const q = query(collection(db, col), ...constraints);
+      const snap = await getCountFromServer(q);
+      return snap.data().count;
+    }
+
+    async function loadDashboard() {
+      const now = Date.now();
+      const ts24h = Timestamp.fromMillis(now - 24 * 60 * 60 * 1000);
+      const ts7d  = Timestamp.fromMillis(now - 7 * 24 * 60 * 60 * 1000);
+      const ts30d = Timestamp.fromMillis(now - 30 * 24 * 60 * 60 * 1000);
+
+      const [
+        totalUsers, newToday, newWeek, newMonth,
+        totalResponses, responsesToday,
+        pendingMod, activeBans, userStrikes
+      ] = await Promise.all([
+        countQuery("users"),
+        countQuery("users", where("verifiedAt", ">=", ts24h)),
+        countQuery("users", where("verifiedAt", ">=", ts7d)),
+        countQuery("users", where("verifiedAt", ">=", ts30d)),
+        countQuery("responses", where("blocked", "==", false)),
+        countQuery("responses", where("createdAt", ">=", ts24h), where("blocked", "==", false)),
+        countQuery("moderation_queue", where("status", "==", "pending")),
+        countQuery("blocked_uids"),
+        countQuery("user_strikes"),
+      ]);
+
+      set("m-total-users", totalUsers);
+      set("m-new-today", newToday);
+      set("m-new-week", newWeek);
+      set("m-new-month", newMonth);
+      set("m-total-responses", totalResponses);
+      set("m-responses-today", responsesToday);
+      set("m-pending-mod", pendingMod);
+      set("m-active-bans", activeBans);
+      set("m-user-strikes", userStrikes);
+
+      await loadTodaysQuestion();
+      document.getElementById("last-updated-time").textContent = new Date().toLocaleTimeString();
+    }
+
+    async function loadTodaysQuestion() {
+      const today = new Date().toISOString().slice(0, 10);
+      const schedSnap = await getDoc(doc(db, "question_schedule", today));
+      if (!schedSnap.exists()) { set("m-todays-question", "No schedule entry for today."); return; }
+      const pulseId = schedSnap.data().pulse_question_id;
+      if (!pulseId) { set("m-todays-question", "No pulse question scheduled."); return; }
+      const pollQ = query(collection(db, "polls"), where("questionId", "==", pulseId), limit(1));
+      const pollSnap = await getDocs(pollQ);
+      if (!pollSnap.empty) {
+        set("m-todays-question", pollSnap.docs[0].data().question || "—");
+        return;
+      }
+      const qSnap = await getDoc(doc(db, "questions", pulseId));
+      set("m-todays-question", qSnap.exists() ? (qSnap.data().text || "—") : "Question not found.");
+    }
+
+    async function loadOperations() {
+      await Promise.all([loadModQueue(), loadSchedule()]);
+    }
+
+    async function loadModQueue() {
+      const wrap = document.getElementById("mod-queue-list");
+      wrap.innerHTML = '<div class="empty-state">Loading…</div>';
+      const q = query(collection(db, "moderation_queue"), where("status", "==", "pending"), orderBy("reportedAt", "desc"));
+      const snap = await getDocs(q);
+      if (snap.empty) { wrap.innerHTML = '<div class="empty-state">No pending reports.</div>'; return; }
+      wrap.innerHTML = snap.docs.map(d => {
+        const data = d.data();
+        const ts = data.reportedAt?.toDate?.()?.toLocaleString() ?? "—";
+        const reporter = data.reporterUid ? data.reporterUid.slice(0, 12) + "…" : "—";
+        return `<div class="queue-item" id="qi-${d.id}">
+          <div class="queue-item-meta">
+            <span><strong>Response</strong> ${data.responseId ?? "—"}</span>
+            <span><strong>Reason</strong> ${data.reason ?? "—"}</span>
+            <span><strong>Reported</strong> ${ts}</span>
+            <span><strong>Reporter</strong> ${reporter}</span>
+          </div>
+          <div class="queue-item-actions">
+            <button class="btn btn-approve" onclick="approveReport('${d.id}')">Approve</button>
+            <button class="btn btn-dismiss" onclick="dismissReport('${d.id}')">Dismiss</button>
+          </div>
+        </div>`;
+      }).join("");
+    }
+
+    window.approveReport = async (reportId) => {
+      const btn = document.querySelector(`#qi-${reportId} .btn-approve`);
+      if (btn) btn.disabled = true;
+      try {
+        const fn = httpsCallable(fns, "approveModerationReport");
+        await fn({ reportId, ejectUser: false });
+        document.getElementById("qi-" + reportId)?.remove();
+        showToast("Report approved.", "success");
+      } catch (e) {
+        showToast("Error: " + e.message, "error");
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    window.dismissReport = async (reportId) => {
+      const btn = document.querySelector(`#qi-${reportId} .btn-dismiss`);
+      if (btn) btn.disabled = true;
+      try {
+        const fn = httpsCallable(fns, "dismissModerationReport");
+        await fn({ reportId });
+        document.getElementById("qi-" + reportId)?.remove();
+        showToast("Report dismissed.", "success");
+      } catch (e) {
+        showToast("Error: " + e.message, "error");
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    async function loadSchedule() {
+      const wrap = document.getElementById("schedule-table-wrap");
+      wrap.innerHTML = '<div class="empty-state">Loading…</div>';
+      const today = new Date();
+      const dates = [];
+      for (let i = 0; i < 14; i++) {
+        const d = new Date(today);
+        d.setUTCDate(today.getUTCDate() + i);
+        dates.push(d.toISOString().slice(0, 10));
+      }
+
+      const schedDocs = await Promise.all(dates.map(d => getDoc(doc(db, "question_schedule", d))));
+      const questionIds = new Set();
+      schedDocs.forEach(sd => {
+        if (!sd.exists()) return;
+        const data = sd.data();
+        if (data.pulse_question_id) questionIds.add(data.pulse_question_id);
+        if (data.horizon_question_id) questionIds.add(data.horizon_question_id);
+      });
+
+      const questionTexts = {};
+      await Promise.all([...questionIds].map(async id => {
+        const qd = await getDoc(doc(db, "questions", id));
+        if (qd.exists()) questionTexts[id] = qd.data().text || "—";
+      }));
+
+      const rows = dates.map((date, i) => {
+        const sd = schedDocs[i];
+        if (!sd.exists()) return `<tr><td class="date-col">${date}</td><td class="q-col" colspan="2" style="color:var(--muted)">No schedule entry</td></tr>`;
+        const data = sd.data();
+        const pulseText = data.pulse_question_id ? (questionTexts[data.pulse_question_id] || "—") : "—";
+        const horizonText = data.horizon_question_id ? (questionTexts[data.horizon_question_id] || "—") : "—";
+        return `<tr><td class="date-col">${date}</td><td class="q-col">${pulseText}</td><td class="q-col">${horizonText}</td></tr>`;
+      }).join("");
+
+      wrap.innerHTML = `<table>
+        <thead><tr><th>Date</th><th>Pulse Question</th><th>Horizon Question</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    }
+
+    window.reschedule = async () => {
+      try {
+        const fn = httpsCallable(fns, "scheduleUpcomingQuestionsManual");
+        showToast("Running scheduler…");
+        await fn({});
+        showToast("Schedule updated.", "success");
+        await loadSchedule();
+      } catch (e) {
+        showToast("Error: " + e.message, "error");
+      }
+    };
+
+    window.restoreResponse = async () => {
+      const responseId = document.getElementById("restore-input").value.trim();
+      if (!responseId) { showToast("Enter a Response ID.", "error"); return; }
+      try {
+        const fn = httpsCallable(fns, "restoreResponse");
+        await fn({ responseId });
+        document.getElementById("restore-input").value = "";
+        showToast("Response restored.", "success");
+      } catch (e) {
+        showToast("Error: " + e.message, "error");
+      }
+    };
+
+    function set(id, val) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = val;
+    }
+
+    let toastTimer;
+    function showToast(msg, type = "") {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.className = "show" + (type ? " " + type : "");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.className = ""; }, 3000);
+    }
+
+    window.showToast = showToast;
+  </script>
+</body>
+</html>
