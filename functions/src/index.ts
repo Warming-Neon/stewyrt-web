@@ -1577,7 +1577,7 @@ export const sendDailyDigest = onSchedule(
     schedule: "0 9 * * *", 
     timeZone: "UTC", 
     region: "us-central1",
-    secrets: ["GMAIL_USER", "GMAIL_PASS"]
+    secrets: ["GMAIL_USER", "GMAIL_PASS", "BUFFER_API_KEY"]
   },
   async () => {
     // v2
@@ -1689,6 +1689,53 @@ Open Admin: https://stewyrt.com/admin`;
       console.log(`[DAILY DIGEST] Email sent successfully: ${info.messageId}`);
     } catch (error) {
       console.error("[DAILY DIGEST] Failed to send email:", error);
+    }
+
+    const bufferApiKey = process.env.BUFFER_API_KEY || "";
+
+    const postText = `💬 Today on Stewyrt:\n\n"${questionText}"\n\nRecord your anonymous voice response at stewyrt.com`;
+
+    const channelIds = [
+      "6a33ee5338b5579345abd627",
+      "6a33ef7c38b5579345abdd85",
+      "6a33efe138b5579345abdfa9"
+    ];
+
+    for (const channelId of channelIds) {
+      try {
+        const bufferRes = await fetch("https://api.buffer.com/graphql", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${bufferApiKey}`
+          },
+          body: JSON.stringify({
+            query: `
+              mutation CreatePost($input: CreatePostInput!) {
+                createPost(input: $input) {
+                  ... on Post {
+                    id
+                    status
+                  }
+                }
+              }
+            `,
+            variables: {
+              input: {
+                channelId,
+                content: {
+                  text: postText
+                }
+              }
+            }
+          })
+        });
+        const bufferData = await bufferRes.json();
+        console.log(`[BUFFER] Posted to ${channelId}:`, 
+          JSON.stringify(bufferData));
+      } catch (err) {
+        console.error(`[BUFFER] Failed to post to ${channelId}:`, err);
+      }
     }
   }
 );
