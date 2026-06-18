@@ -5,6 +5,15 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Add Buffer social posting to daily digest
+
+- **`functions/src/index.ts`**:
+  - Mounted `"BUFFER_API_KEY"` secret into `sendDailyDigest` configuration.
+  - Added Buffer integration utilizing their GraphQL API to publish the daily Pulse question to Buffer channels.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Route digest emails directly to wnltduk@gmail.com
 
 - **`functions/src/index.ts`**: Changed the recipient address in the daily digest's `mailOptions` from `"social@stewyrt.com"` to `"wnltduk@gmail.com"`.

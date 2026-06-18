@@ -679,7 +679,8 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 1. Calculate time windows for: yesterday (last 24 hours), last7days, and last30days.
 2. Query Firestore database for key growth, engagement, and moderation counts (new users, total users, response counts, pending moderation reports, banned users).
 3. Query today's active Pulse question text from `polls` via `question_schedule`.
-4. Compose a plain text email digest with the metrics and email it to `social@stewyrt.com` using Gmail SMTP transporter (`GMAIL_USER` / `GMAIL_PASS` credentials from environment variables).
+4. Compose a plain text email digest with the metrics and email it directly to `wnltduk@gmail.com` using Gmail SMTP transporter (`GMAIL_USER` / `GMAIL_PASS` secrets).
+5. Post today's active Pulse question text to Buffer channels using Buffer's GraphQL API (`BUFFER_API_KEY` secret).
 
 ---
 
