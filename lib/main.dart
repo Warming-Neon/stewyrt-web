@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 import 'screens/archive_screen.dart';
 import 'screens/pulse_screen.dart';
@@ -17,10 +18,12 @@ import 'theme/theme_notifier.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final analytics = FirebaseAnalytics.instance;
+  await analytics.setAnalyticsCollectionEnabled(true);
   runApp(
     ChangeNotifierProvider(
       create: (_) => ThemeNotifier(),
-      child: const StewyrtApp(),
+      child: StewyrtApp(analytics: analytics),
     ),
   );
 }
@@ -62,7 +65,8 @@ class _BouncingScrollBehavior extends ScrollBehavior {
 }
 
 class StewyrtApp extends StatelessWidget {
-  const StewyrtApp({super.key});
+  final FirebaseAnalytics? analytics;
+  const StewyrtApp({super.key, this.analytics});
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +78,11 @@ class StewyrtApp extends StatelessWidget {
       darkTheme: AppTheme.dark,
       themeMode: themeNotifier.mode,
       scrollBehavior: _BouncingScrollBehavior(),
-      navigatorObservers: [ResonanceController.routeObserver],
+      navigatorObservers: [
+        ResonanceController.routeObserver,
+        if (analytics != null)
+          FirebaseAnalyticsObserver(analytics: analytics!),
+      ],
       home: const BootRouter(),
     );
   }
