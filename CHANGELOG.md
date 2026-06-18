@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Fix evening post template literal interpolation
+
+- **`functions/src/index.ts`**: Corrected the evening post template literal syntax within `postToBuffer` to ensure the variables are properly interpolated and evaluated in Node.js.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Add sendEveningPost Cloud Function and postToBuffer helper
 
 - **`functions/src/index.ts`**:
