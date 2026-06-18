@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Remove temporary comment from evening post template literal
+
+- **`functions/src/index.ts`**: Removed the temporary `// evening format` comment at the end of the evening `postText` string assignment.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Fix evening post template literal interpolation
 
 - **`functions/src/index.ts`**: Corrected the evening post template literal syntax within `postToBuffer` to ensure the variables are properly interpolated and evaluated in Node.js.
