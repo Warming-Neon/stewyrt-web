@@ -72,7 +72,7 @@ stewyrt/
 │   └── icons/                            — PWA icons (generated)
 │
 ├── functions/
-│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, restoreResponse, approveModerationReport, dismissModerationReport, deleteOwnResponse, activateDailyQuestion, activateDailyQuestionManual
+│   └── src/index.ts                      — Cloud Functions: analyzeAudio, purgeOldSentimentAudio, submitSelfReportedDemographics, scheduleUpcomingQuestions, scheduleUpcomingQuestionsManual, submitModerationReview, deleteUserData, submitContentReport, restoreResponse, approveModerationReport, dismissModerationReport, deleteOwnResponse, activateDailyQuestion, activateDailyQuestionManual, sendDailyDigest
 │
 ├── scripts/
 │   ├── seed_questions.js                 — Idempotent seed: populates questions collection; uses ../functions/node_modules/firebase-admin
@@ -668,6 +668,18 @@ Three.js draws `CatmullRomCurve3` paths **only** from the explicit `edges` array
 2. Validate `responseId` is valid UUID v4
 3. Verify response exists and its `uid` field matches the caller's UID
 4. Mark response document as `blocked: true` and `deletedByUser: true`
+
+---
+
+### `sendDailyDigest` — Scheduled function
+
+**Schedule:** `onSchedule("0 9 * * *")` — daily at 09:00 UTC (Region: `us-central1`)
+
+**Logic:**
+1. Calculate time windows for: yesterday (last 24 hours), last7days, and last30days.
+2. Query Firestore database for key growth, engagement, and moderation counts (new users, total users, response counts, pending moderation reports, banned users).
+3. Query today's active Pulse question text from `polls` via `question_schedule`.
+4. Compose a plain text email digest with the metrics and email it to `social@stewyrt.com` using Gmail SMTP transporter (`GMAIL_USER` / `GMAIL_PASS` credentials from environment variables).
 
 ---
 
