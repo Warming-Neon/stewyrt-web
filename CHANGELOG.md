@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Force daily digest function revision for secret refresh
+
+- **`functions/src/index.ts`**: Added `// v2` comment inside `sendDailyDigest` function body to force a new revision deployment.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Add daily digest email Cloud Function
 
 - **`functions/src/index.ts`**: Added `sendDailyDigest` scheduled Cloud Function configured to run daily at 09:00 UTC (in `us-central1`). Queries Firestore metrics for new users (24h/7d/30d/total), active responses (24h/total), pending moderation, banned users, and today's active Pulse question text, mailing a formatted text report to `social@stewyrt.com` via `nodemailer` using Gmail SMTP.
