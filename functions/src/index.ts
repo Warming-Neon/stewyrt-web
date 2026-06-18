@@ -1583,7 +1583,7 @@ async function postToBuffer(questionText: string, isMorning: boolean, totalUsers
   if (isMorning) {
     postText = `💬 Today on Stewyrt:\n\n"${questionText}"\n\nJoin ${totalUsers} anonymous voices. Record yours at stewyrt.com\n\n#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`;
   } else {
-    postText = `🎙️ Have you answered today's question yet?\n\n"${questionText}"\n\n${totalUsers} anonymous voices and counting. stewyrt.com\n\n#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`;
+    postText = `🎙️ Have you answered today's question yet?\n\n"${questionText}"\n\n${totalUsers} anonymous voices and counting. stewyrt.com\n\n#Stewyrt #SoTellEveryoneWhatYouReallyThink #BeAnonymous #JustBeYou`; // evening format
   }
 
   const channelIds = [
