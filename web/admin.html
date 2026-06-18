@@ -390,10 +390,7 @@
       httpsCallable
     } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-functions.js";
 
-    const ADMIN_UIDS = [
-      "4LRTJGllvUWd7lM76ZzOIfRBU863",
-      "qHXRYnA07POvdtXVMZY4dW9FrTg1"
-    ];
+    const ADMIN_UIDS = ["4LRTJGllvUWd7lM76ZzOIfRBU863"];
 
     const app = initializeApp({
       apiKey: "AIzaSyBOWqfIXjTUsw-_4XhlYjLm5hnonbzpqXs",
@@ -437,6 +434,8 @@
       }
       console.log("Signed in UID:", user.uid);
       if (!ADMIN_UIDS.includes(user.uid)) {
+        clearInterval(refreshInterval);
+        await fbSignOut(auth);
         show("access-denied");
         return;
       }

@@ -5,6 +5,14 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Restrict admin access to tee_em only
+
+- **`web/admin.html`**: Reduced `ADMIN_UIDS` to single UID `4LRTJGllvUWd7lM76ZzOIfRBU863`; denied path now calls `fbSignOut(auth)` before showing the access-denied screen.
+- **`firestore.rules`**: Admin override block reduced to single UID.
+- **Firebase Deploy**: Redeployed hosting and Firestore rules.
+
+---
+
 ## [2026-06-18] — Hardcode admin UIDs, add Firestore admin read access
 
 - **`web/admin.html`**: Replaced `ADMIN_UID` string with `ADMIN_UIDS` array containing both admin UIDs; updated UID check to `ADMIN_UIDS.includes(user.uid)`.

@@ -124,8 +124,7 @@ service cloud.firestore {
     match /{document=**} {
       allow read, write: if request.auth != null &&
         request.auth.uid in [
-          "4LRTJGllvUWd7lM76ZzOIfRBU863",
-          "qHXRYnA07POvdtXVMZY4dW9FrTg1"
+          "4LRTJGllvUWd7lM76ZzOIfRBU863"
         ];
     }
 
