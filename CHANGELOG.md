@@ -5,6 +5,13 @@ Format: `[version or date] — summary`, newest first.
 
 ---
 
+## [2026-06-18] — Route digest emails directly to wnltduk@gmail.com
+
+- **`functions/src/index.ts`**: Changed the recipient address in the daily digest's `mailOptions` from `"social@stewyrt.com"` to `"wnltduk@gmail.com"`.
+- **Firebase Deploy**: Redeployed updated Cloud Functions.
+
+---
+
 ## [2026-06-18] — Mount Gmail secrets into digest function env
 
 - **`functions/src/index.ts`**: Added `secrets: ["GMAIL_USER", "GMAIL_PASS"]` to `sendDailyDigest` scheduled function options to mount secrets as local environment variables.
