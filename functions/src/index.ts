@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
+import * as nodemailer from "nodemailer";
 import { onObjectFinalized } from "firebase-functions/v2/storage";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -1569,3 +1570,119 @@ export const activateDailyQuestionManual = onCall(async (request) => {
   }
   return await runDailyActivation(admin.firestore());
 });
+
+// Scheduled: daily at 09:00 UTC.
+export const sendDailyDigest = onSchedule(
+  { schedule: "0 9 * * *", timeZone: "UTC", region: "us-central1" },
+  async () => {
+    const db = admin.firestore();
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // Calculate time windows
+    const yesterday = admin.firestore.Timestamp.fromDate(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+    const last7days = admin.firestore.Timestamp.fromDate(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+    const last30days = admin.firestore.Timestamp.fromDate(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+
+    // Run count queries in parallel
+    const [
+      newUsersTodaySnap,
+      newUsers7dSnap,
+      newUsers30dSnap,
+      totalUsersSnap,
+      responsesTodaySnap,
+      totalResponsesSnap,
+      pendingModerationSnap,
+      bannedUsersSnap,
+    ] = await Promise.all([
+      db.collection("users").where("verifiedAt", ">=", yesterday).count().get(),
+      db.collection("users").where("verifiedAt", ">=", last7days).count().get(),
+      db.collection("users").where("verifiedAt", ">=", last30days).count().get(),
+      db.collection("users").count().get(),
+      db.collection("responses").where("createdAt", ">=", yesterday).where("blocked", "==", false).count().get(),
+      db.collection("responses").where("blocked", "==", false).count().get(),
+      db.collection("moderation_queue").where("status", "==", "pending").count().get(),
+      db.collection("blocked_uids").count().get(),
+    ]);
+
+    const newUsersToday = newUsersTodaySnap.data().count;
+    const newUsers7d = newUsers7dSnap.data().count;
+    const newUsers30d = newUsers30dSnap.data().count;
+    const totalUsers = totalUsersSnap.data().count;
+    const responsesToday = responsesTodaySnap.data().count;
+    const totalResponses = totalResponsesSnap.data().count;
+    const pendingModeration = pendingModerationSnap.data().count;
+    const bannedUsers = bannedUsersSnap.data().count;
+
+    // Fetch today's question
+    let questionText = "No active pulse question found for today";
+    const scheduleDoc = await db.collection("question_schedule").doc(todayStr).get();
+    if (scheduleDoc.exists) {
+      const pulseQuestionId = scheduleDoc.data()?.pulse_question_id;
+      if (pulseQuestionId) {
+        const pollSnap = await db.collection("polls")
+          .where("questionId", "==", pulseQuestionId)
+          .limit(1)
+          .get();
+        if (!pollSnap.empty) {
+          questionText = pollSnap.docs[0].data()?.question || "No question text";
+        } else {
+          // Fallback check questions
+          const questionSnap = await db.collection("questions").doc(pulseQuestionId).get();
+          if (questionSnap.exists) {
+            questionText = questionSnap.data()?.text || "No question text";
+          }
+        }
+      }
+    }
+
+    // Build plain text email body
+    const emailBody = `STEWYRT DAILY DIGEST — ${todayStr}
+
+GROWTH
+New users today: ${newUsersToday}
+New users (7d): ${newUsers7d}
+New users (30d): ${newUsers30d}
+Total users: ${totalUsers}
+
+ENGAGEMENT
+Responses today: ${responsesToday}
+Total responses: ${totalResponses}
+
+TODAY'S PULSE QUESTION
+"${questionText}"
+
+MODERATION
+Pending reports: ${pendingModeration}
+Banned users: ${bannedUsers}
+
+---
+Open Admin: https://stewyrt.com/admin`;
+
+    // Transporter configuration using Gmail SMTP with placeholder fallbacks
+    const gmailUser = process.env.GMAIL_USER || "placeholder-user@gmail.com";
+    const gmailPass = process.env.GMAIL_PASS || "placeholder-pass";
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: gmailUser,
+        pass: gmailPass,
+      },
+    });
+
+    const mailOptions = {
+      from: `"Stewyrt System" <${gmailUser}>`,
+      to: "social@stewyrt.com",
+      subject: `Stewyrt Daily Digest — ${todayStr}`,
+      text: emailBody,
+    };
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`[DAILY DIGEST] Email sent successfully: ${info.messageId}`);
+    } catch (error) {
+      console.error("[DAILY DIGEST] Failed to send email:", error);
+    }
+  }
+);
