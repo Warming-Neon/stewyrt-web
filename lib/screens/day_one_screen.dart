@@ -69,7 +69,6 @@ class _DayOneScreenState extends State<DayOneScreen>
   final _limiter = const SoftLimiter();
   DateTime? _recordStartTime;
   Duration _recordDuration = Duration.zero;
-  Timer? _clockTimer;
   Timer? _maxDurationTimer;
   StreamSubscription<Amplitude>? _ampSub;
 
@@ -113,7 +112,6 @@ class _DayOneScreenState extends State<DayOneScreen>
   @override
   void dispose() {
     _ampSub?.cancel();
-    _clockTimer?.cancel();
     _maxDurationTimer?.cancel();
     _positionSub?.cancel();
     _playerStateSub?.cancel();
@@ -204,10 +202,6 @@ class _DayOneScreenState extends State<DayOneScreen>
       });
     });
 
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _recordDuration += const Duration(seconds: 1));
-    });
-
     _maxDurationTimer = Timer(const Duration(seconds: 30), () {
       debugPrint('[STEWYRT][DAY1] 30s limit reached — auto-stopping');
       HapticFeedback.mediumImpact();
@@ -225,7 +219,6 @@ class _DayOneScreenState extends State<DayOneScreen>
     _maxDurationTimer?.cancel();
     _maxDurationTimer = null;
     await _ampSub?.cancel();
-    _clockTimer?.cancel();
 
     final startTime = _recordStartTime;
     final duration = startTime != null
@@ -627,14 +620,8 @@ class _DayOneScreenState extends State<DayOneScreen>
           ),
         ),
         const SizedBox(height: 20),
-        Text(
-          _fmtDuration(_recordDuration),
-          style: GoogleFonts.spaceGrotesk(
-            fontSize: 28,
-            fontWeight: FontWeight.w300,
-            color: const Color(0xFFF5F5F5),
-            letterSpacing: -0.5,
-          ),
+        _RecordingDurationCounter(
+          recordStartTime: _recordStartTime ?? DateTime.now(),
         ),
         const SizedBox(height: 20),
         Listener(
@@ -1176,3 +1163,56 @@ class _PlaybackWaveformPainter extends CustomPainter {
   bool shouldRepaint(_PlaybackWaveformPainter old) =>
       old.progress != progress || old.played != played;
 }
+
+class _RecordingDurationCounter extends StatefulWidget {
+  final DateTime recordStartTime;
+  const _RecordingDurationCounter({required this.recordStartTime});
+
+  @override
+  State<_RecordingDurationCounter> createState() =>
+      _RecordingDurationCounterState();
+}
+
+class _RecordingDurationCounterState extends State<_RecordingDurationCounter> {
+  late Timer _timer;
+  Duration _duration = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _duration = DateTime.now().difference(widget.recordStartTime);
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _duration = DateTime.now().difference(widget.recordStartTime);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  String _fmtDuration(Duration d) {
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _fmtDuration(_duration),
+      style: GoogleFonts.spaceGrotesk(
+        fontSize: 28,
+        fontWeight: FontWeight.w300,
+        color: const Color(0xFFF5F5F5),
+        letterSpacing: -0.5,
+      ),
+    );
+  }
+}
+

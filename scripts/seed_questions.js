@@ -325,6 +325,54 @@ const QUESTIONS = [
     cooldown_days:    180,
     notes:            'Conversational, slightly cheeky. Dares user to actually answer instead of platitude.',
   },
+  {
+    text:             "What's the most embarrassing thing you were absolutely convinced was a great idea at the time?",
+    tier:             "pulse",
+    category:         "retrospective",
+    emotional_weight: "light",
+    day_affinity:     "saturday",
+    cooldown_days:    90,
+    status:           "approved",
+    times_used:       0,
+    last_used_date:   null,
+    first_used_date:  null,
+  },
+  {
+    text:             "What's a decision you made on a complete whim that somehow turned out to be one of the best of your life?",
+    tier:             "pulse",
+    category:         "retrospective",
+    emotional_weight: "medium",
+    day_affinity:     "saturday",
+    cooldown_days:    90,
+    status:           "approved",
+    times_used:       0,
+    last_used_date:   null,
+    first_used_date:  null,
+  },
+  {
+    text:             "If future you showed up at your door tomorrow, what's the first thing they'd tell you to stop wasting time on?",
+    tier:             "pulse",
+    category:         "anticipatory",
+    emotional_weight: "medium",
+    day_affinity:     "saturday",
+    cooldown_days:    90,
+    status:           "approved",
+    times_used:       0,
+    last_used_date:   null,
+    first_used_date:  null,
+  },
+  {
+    text:             "What's the one thing you'd do tomorrow if you genuinely believed you couldn't fail?",
+    tier:             "pulse",
+    category:         "anticipatory",
+    emotional_weight: "medium",
+    day_affinity:     "saturday",
+    cooldown_days:    90,
+    status:           "approved",
+    times_used:       0,
+    last_used_date:   null,
+    first_used_date:  null,
+  },
 ];
 
 async function run() {
@@ -340,7 +388,7 @@ async function run() {
       continue;
     }
 
-    await col.add({
+    const docRef = await col.add({
       ...q,
       status:          'approved',
       times_used:      0,
@@ -350,7 +398,7 @@ async function run() {
       updated_at:      now,
     });
 
-    console.log(`[seed] CREATE "${q.text.slice(0, 60)}..."`);
+    console.log(`[seed] CREATE "${q.text.slice(0, 60)}..." ID: ${docRef.id}`);
   }
 
   console.log('[seed] Done.');

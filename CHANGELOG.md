@@ -3,6 +3,23 @@
 All notable changes to Stewyrt are recorded here.  
 Format: `[version or date] — summary`, newest first.
 
+## [2026-06-19] — Fix Horizon deactivation, seed questions, fix waveform rendering choppiness
+
+- **`lib/screens/day_one_screen.dart`**: Extracted the recording duration counter into a standalone private `_RecordingDurationCounter` StatefulWidget, isolating its 1Hz `setState` calls and preventing conflicts with the 20Hz amplitude polling of the waveform painter.
+- **`lib/widgets/recording_sheet.dart`**: Similarly extracted the duration counter into `_RecordingDurationCounter` to ensure smooth scrolling waveform rendering.
+- **`functions/src/index.ts`**:
+  - Refactored `runDailyActivation` to decouple the deactivation of previous active `horizon` polls from the scheduled question activation on Mondays.
+  - Implemented an age-based backstop in `runDailyActivation` that automatically deactivates any active `horizon` poll whose `createdAt` is older than 8 days on any run.
+  - Deployed Cloud Functions to Firebase.
+- **`scripts/seed_questions.js`**: Added 4 new Saturday Pulse questions to the `QUESTIONS` array. Modified the logging logic when writing documents to Firestore to capture and output the Firestore document ID of newly created questions.
+- **`CONTEXT_MAP.md`**:
+  - Updated questions seeded count from 32 to 36.
+  - Added a note on active poll limits and the Horizon deactivation/backstop logic.
+- **Firestore Maintenance**:
+  - Deactivated stuck Horizon poll `T4gXz2H9w9YJOmRF476B` (`isActive: false`).
+  - Reset stats (`times_used`, `last_used_date`, `first_used_date`) for all 36 question documents in the `questions` collection via batch write.
+  - Cleared future `question_schedule` documents from `2026-06-20` onwards and triggered `runScheduler` manually to schedule the next 14 days (June 20 through July 3).
+
 ---
 
 ## [2026-06-18] — Restrict admin access to tee_em only

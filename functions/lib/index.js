@@ -1260,12 +1260,51 @@ async function runDailyActivation(db) {
     summary.pulseQuestionText = pulseText;
     summary.newPulsePollId = newPulseRef.id;
     console.log(`[ACTIVATION] Pulse activated — pollId: ${newPulseRef.id}, question: "${pulseText.slice(0, 60)}"`);
+    // ── HORIZON DEACTIVATION & BACKSTOP ──────────────────────────────────────
+    // 1. On Mondays, ALWAYS deactivate all active horizon polls.
+    // 2. On any day, deactivate any active horizon poll created > 8 days ago.
+    const prevHorizonSnap = await db.collection("polls")
+        .where("tier", "==", "horizon")
+        .where("isActive", "==", true)
+        .get();
+    if (!prevHorizonSnap.empty) {
+        const horizonDeactivateBatch = db.batch();
+        let deactivatedCount = 0;
+        const eightDaysAgo = new Date();
+        eightDaysAgo.setDate(eightDaysAgo.getDate() - 8);
+        const cutoffTime = eightDaysAgo.getTime();
+        for (const doc of prevHorizonSnap.docs) {
+            let shouldDeactivate = false;
+            if (isMonday) {
+                shouldDeactivate = true;
+            }
+            else {
+                const createdAt = doc.data()["createdAt"];
+                if (createdAt) {
+                    const createdDate = createdAt.toDate ? createdAt.toDate() : new Date(createdAt);
+                    if (createdDate.getTime() < cutoffTime) {
+                        shouldDeactivate = true;
+                        console.log(`[ACTIVATION] Backstop triggered for stale Horizon poll: ${doc.id}`);
+                    }
+                }
+            }
+            if (shouldDeactivate) {
+                horizonDeactivateBatch.update(doc.ref, { isActive: false });
+                summary.previousPollsDeactivated.push(doc.id);
+                deactivatedCount++;
+            }
+        }
+        if (deactivatedCount > 0) {
+            await horizonDeactivateBatch.commit();
+            console.log(`[ACTIVATION] Horizon deactivation batch complete — deactivated: ${deactivatedCount} poll(s)`);
+        }
+    }
     // ── HORIZON ACTIVATION (Mondays only) ────────────────────────────────────
     if (!isMonday) {
         summary.horizonReason = "not Monday";
     }
     else if (!horizonQuestionId) {
-        const warn = `question_schedule/${today} has no horizon_question_id — skipping horizon`;
+        const warn = `question_schedule/${today} has no horizon_question_id — skipping horizon activation`;
         console.warn(`[ACTIVATION] ${warn}`);
         summary.warnings.push(warn);
         summary.horizonReason = "no horizon_question_id in schedule";
@@ -1273,7 +1312,7 @@ async function runDailyActivation(db) {
     else {
         const horizonQSnap = await db.collection("questions").doc(horizonQuestionId).get();
         if (!horizonQSnap.exists) {
-            const warn = `questions/${horizonQuestionId} not found — skipping horizon`;
+            const warn = `questions/${horizonQuestionId} not found — skipping horizon activation`;
             console.warn(`[ACTIVATION] ${warn}`);
             summary.warnings.push(warn);
             summary.horizonReason = "horizon question doc missing";
@@ -1282,17 +1321,6 @@ async function runDailyActivation(db) {
             const horizonQData = horizonQSnap.data();
             const horizonText = horizonQData["text"];
             const isFirstHorizonUse = !horizonQData["first_used_date"];
-            // Deactivate previous active horizon polls.
-            const prevHorizonSnap = await db.collection("polls")
-                .where("tier", "==", "horizon")
-                .where("isActive", "==", true)
-                .get();
-            const horizonBatch = db.batch();
-            for (const doc of prevHorizonSnap.docs) {
-                horizonBatch.update(doc.ref, { isActive: false });
-                summary.previousPollsDeactivated.push(doc.id);
-            }
-            await horizonBatch.commit();
             // Create new horizon poll.
             const newHorizonRef = await db.collection("polls").add({
                 tier: "horizon",
@@ -1356,7 +1384,7 @@ async function postToBuffer(questionText, isMorning, totalUsers) {
                     id
                   }
                 }
-                ... on PostActionError {
+                ... on MutationError {
                   message
                 }
               }
@@ -1365,9 +1393,9 @@ async function postToBuffer(questionText, isMorning, totalUsers) {
                     variables: {
                         input: {
                             channelId,
-                            content: {
-                                text: postText
-                            }
+                            text: postText,
+                            schedulingType: "automatic",
+                            mode: "addToQueue"
                         }
                     }
                 })

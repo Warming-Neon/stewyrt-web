@@ -260,6 +260,8 @@ Open in any browser at `http://localhost:8080`.
 | `counts.flavor.*` | Number | Per-word flavor counts |
 | `counts.essence.*` | Number | Per-word essence counts |
 
+**Note:** Only one poll of each tier (`pulse` / `horizon` / `ice_breaker`) should be active at any given time. For `horizon` polls, deactivation of old polls is handled during the daily activation routine on Mondays. In addition, there is a daily backstop that automatically deactivates any active `horizon` poll older than 8 days.
+
 ### `users` collection (onboarding verification + demographics)
 | Field | Type | Notes |
 |-------|------|-------|
@@ -294,7 +296,7 @@ Demographics are **self-reported** only — never inferred from voice. Written b
 | `created_at` | Timestamp | Seed time |
 | `updated_at` | Timestamp | Last update |
 
-32 questions seeded (6 original + 26 Week 1–4). Composite index on `(tier ASC, status ASC)`.
+36 questions seeded (6 original + 26 Week 1–4 + 4 new Saturday Pulse questions). Composite index on `(tier ASC, status ASC)`.
 
 ### `question_schedule` collection
 Doc ID is `YYYY-MM-DD`. Written by `scheduleUpcomingQuestions` / `scheduleUpcomingQuestionsManual`.

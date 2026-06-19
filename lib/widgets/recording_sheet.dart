@@ -63,7 +63,6 @@ class _RecordingSheetState extends State<RecordingSheet>
   // Recording clock + 30-second hard cutoff
   DateTime? _recordStartTime;
   Duration _recordDuration = Duration.zero;
-  Timer? _clockTimer;
   Timer? _maxDurationTimer;
   StreamSubscription<Amplitude>? _ampSub;
 
@@ -109,7 +108,6 @@ class _RecordingSheetState extends State<RecordingSheet>
   @override
   void dispose() {
     _ampSub?.cancel();
-    _clockTimer?.cancel();
     _maxDurationTimer?.cancel();
     _positionSub?.cancel();
     _playerStateSub?.cancel();
@@ -218,10 +216,6 @@ class _RecordingSheetState extends State<RecordingSheet>
       });
     });
 
-    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _recordDuration += const Duration(seconds: 1));
-    });
-
     // Auto-stop at 30 seconds.
     _maxDurationTimer = Timer(const Duration(seconds: 30), () {
       debugPrint('[STEWYRT][RECORD] 30s limit reached — auto-stopping recording');
@@ -241,7 +235,6 @@ class _RecordingSheetState extends State<RecordingSheet>
     _maxDurationTimer?.cancel();
     _maxDurationTimer = null;
     await _ampSub?.cancel();
-    _clockTimer?.cancel();
 
     // Calculate quality metrics BEFORE stopping (or right after)
     final startTime = _recordStartTime;
@@ -652,14 +645,9 @@ class _RecordingSheetState extends State<RecordingSheet>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              _fmtDuration(_recordDuration),
-              style: GoogleFonts.spaceGrotesk(
-                fontSize: 28,
-                fontWeight: FontWeight.w300,
-                color: fg,
-                letterSpacing: -0.5,
-              ),
+            _RecordingDurationCounter(
+              recordStartTime: _recordStartTime ?? DateTime.now(),
+              color: fg,
             ),
           ],
         ),
@@ -1197,3 +1185,57 @@ class _TagChip extends StatelessWidget {
     return GestureDetector(onTap: onTap, child: chip);
   }
 }
+
+class _RecordingDurationCounter extends StatefulWidget {
+  final DateTime recordStartTime;
+  final Color color;
+  const _RecordingDurationCounter({required this.recordStartTime, required this.color});
+
+  @override
+  State<_RecordingDurationCounter> createState() =>
+      _RecordingDurationCounterState();
+}
+
+class _RecordingDurationCounterState extends State<_RecordingDurationCounter> {
+  late Timer _timer;
+  Duration _duration = Duration.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _duration = DateTime.now().difference(widget.recordStartTime);
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) {
+        setState(() {
+          _duration = DateTime.now().difference(widget.recordStartTime);
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    super.dispose();
+  }
+
+  String _fmtDuration(Duration d) {
+    final m = d.inMinutes.remainder(60);
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      _fmtDuration(_duration),
+      style: GoogleFonts.spaceGrotesk(
+        fontSize: 28,
+        fontWeight: FontWeight.w300,
+        color: widget.color,
+        letterSpacing: -0.5,
+      ),
+    );
+  }
+}
+
