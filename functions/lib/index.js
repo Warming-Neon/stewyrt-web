@@ -1395,7 +1395,8 @@ async function postToBuffer(questionText, isMorning, totalUsers) {
                             channelId,
                             text: postText,
                             schedulingType: "automatic",
-                            mode: "addToQueue"
+                            mode: "addToQueue",
+                            media: { photo: "https://stewyrt.com/apple-touch-icon.png" }
                         }
                     }
                 })
